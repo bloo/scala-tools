@@ -13,6 +13,7 @@ class WroSpec extends Specification with Mockito with Logger {
 	"Wro Worker" should {
 	    
 	    "render coffeescript into js" in {
+	        logger info "render coffeescript!"
 	        success
 	    }
 	    

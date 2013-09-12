@@ -8,9 +8,13 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   val webjar_coffeescript = "1.6.3"
   val bourbon_gem = "2.1.0"
   Seq(
-  "me.n4u.sass" % "sass-gems" % sass, // replace wro4j-ext's older sass-gems
+  "org.jruby" % "jruby-complete" % jruby,
+  "me.n4u.sass" % "sass-gems" % sass, 
+  "org.webjars" % "webjars-locator" % webjar_locator,
+  "org.webjars" % "coffee-script" % webjar_coffeescript,
+  "nz.co.edmi" % "bourbon-gem-jar" % bourbon_gem,
   "ro.isdc.wro4j" % "wro4j-core" % wro,
-  "ro.isdc.wro4j" % "wro4j-extensions" % wro intransitive(),
+  "ro.isdc.wro4j" % "wro4j-extensions" % wro intransitive()
   // http://mvnrepository.com/artifact/ro.isdc.wro4j/wro4j-extensions/1.7.0
   //ExclusionRule(organization = "com.github.lltyk", name = "dojo-shrinksafe"),
   //ExclusionRule(organization = "com.github.sommeri", name = "less4j"),
@@ -19,7 +23,7 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   //ExclusionRule(organization = "commons-io", name = "commons-io"),
   //ExclusionRule(organization = "commons-pool", name = "commons-pool"),
   //ExclusionRule(organization = "javax.servlet", name = "servlet-api"),
-  //ExclusionRule(organization = "me.n4u.sass", name = "sass-gems"),
+  //ExclusionRule(organization = "me.n4u.sass", name = "sass-gems"), // need newer version
   //ExclusionRule(organization = "nz.co.edmi", name = "bourbon-gem-jar"), // need
   //ExclusionRule(organization = "org.apache.commons", name = "commons-lang3"),
   //ExclusionRule(organization = "org.codehaus.gmaven.runtime", name = "gmaven-runtime-1.7"),
@@ -34,10 +38,6 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   //ExclusionRule(organization = "org.webjars", name = "json2"),
   //ExclusionRule(organization = "org.webjars", name = "less"),
   //ExclusionRule(organization = "org.webjars", name = "webjars-locator") // need
-  "org.jruby" % "jruby" % jruby,
-  "org.webjars" % "webjars-locator" % webjar_locator,
-  "org.webjars" % "coffee-script" % webjar_coffeescript,
-  "nz.co.edmi" % "bourbon-gem-jar" % bourbon_gem
   )
 }
 
