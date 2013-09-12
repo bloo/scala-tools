@@ -1,4 +1,3 @@
-
 package b.uf.api.auth
 
 import org.joda.time.DateTime
@@ -11,9 +10,10 @@ import unfiltered.request.HttpRequest
 import b.uf.api.ResourcePlan
 
 
-class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "sessions") {
+class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "sessions")
+	with BasicResourceAuthComponent[T,S] {
     this: TokenComponent[T] with SessionComponent[T,S] =>
-
+    
 	// we can get, create, or delete a session only if we've been authenticated
 	//
     def authorizeSave[A](auth: Option[T], req: HttpRequest[A]): Boolean = permIfAuth(auth)

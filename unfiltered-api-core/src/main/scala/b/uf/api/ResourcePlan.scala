@@ -16,15 +16,6 @@ import unfiltered.response.ResponseString
 import unfiltered.response.Unauthorized
 import b.common.Logger
 
-
-trait ResourceAuthComponent[T] {
-    def authService: AuthService
-    trait AuthService {
-        val realm: String
-        def authenticate[X](req: unfiltered.request.HttpRequest[X]): Option[T]
-    }
-}
-
 object ResourcePlan {
     
     var optimize = false
@@ -61,7 +52,6 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
     
 	lazy val PathConfig = (Version, Group, Resource)
     lazy val PathPrefix = "/api/%s/%s/%s" format("v"+Version, Group, Resource)
-    lazy val Realm = authService.realm
 
     def permIfAuth(auth: Option[T]) : Boolean = ResourcePlan permIfAuth auth
     def toJson(obj: Any): String = ResourcePlan toJson obj
