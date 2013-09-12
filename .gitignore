@@ -1,0 +1,12 @@
+.project
+.classpath
+target
+.gwt
+.settings
+.factorypath
+.env
+.cache
+rebel.xml
+*~
+.DS_Store
+velocity.log
