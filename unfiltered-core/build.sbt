@@ -8,7 +8,7 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   "net.databinder" %% "unfiltered" % unfiltered,
   "net.databinder" %% "unfiltered-filter" % unfiltered,
   "net.databinder" %% "unfiltered-jetty" % unfiltered,
-  "org.fusesource.scalate" %% "scalate-core" % scalate intransitive(),
+  "org.fusesource.scalate" %% "scalate-core" % scalate exclude("org.scala-lang", "scala-compiler"),
   "org.fusesource.scalamd" %% "scalamd" % scalamd
   )
 }

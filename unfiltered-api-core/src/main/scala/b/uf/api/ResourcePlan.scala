@@ -18,7 +18,7 @@ import b.common.Logger
 
 object ResourcePlan {
     
-    var optimize = false
+    var prettyJson = false
     
     // helper for subclasses - if authenticated, return true
     //
@@ -34,7 +34,7 @@ object ResourcePlan {
 	    import net.liftweb.json.Extraction._
 	    implicit val formats = DefaultFormats // brings in default date formats etc.
         val doc = render(decompose(obj))
-        if (!optimize) pretty(doc) else compact(doc)
+        if (!prettyJson) pretty(doc) else compact(doc)
     }
     
     // helper json deserializer
