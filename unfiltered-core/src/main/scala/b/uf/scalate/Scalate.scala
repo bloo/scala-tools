@@ -45,7 +45,7 @@ object ScalateTemplate {
 
     val engine = new TemplateEngine
     engine.layoutStrategy = new DefaultLayoutStrategy(engine, Scalate.templatePath + Scalate.layoutTemplate)
-    engine.allowCaching = Scalate.debug
+    engine.allowCaching = !Scalate.debug
     engine.allowReload = Scalate.debug
     engine.mode = if (Scalate.debug) "development" else "production"
     val renderContext: ToRenderContext = (path, writer, engine) => new DefaultRenderContext(path, engine, writer)
