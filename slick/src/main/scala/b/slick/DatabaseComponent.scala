@@ -11,24 +11,33 @@ import javax.validation.ConstraintViolationException
 
 trait Tx extends TxBase with DefaultSlickSessionComponent
 
-case class DatabaseConnect(scheme: String, jdbcUrl: String, user: String, pass: String)
-
 object DB {
 
-    def apply(dbConnect: DatabaseConnect) {
-        DB.dbConnect = Some(dbConnect)
+    def apply[D <: DatabaseComponent](dbComp: D) {
+        DB.dbConfig = Some(dbComp)
         DB.db // init on 'apply' for fast-fail
     }
 
-    private var dbConnect: Option[DatabaseConnect] = None
+    def heroku(uri: java.net.URI) = {
+        val userInfo = uri.getUserInfo.split(":")
+        val user = userInfo(0)
+        val port = uri.getPort
+        implicit val dc = DatabaseConnect(user, uri.getHost, uri.getPath,
+        		if (userInfo.length > 1) Some(userInfo(1)) else None,
+                if (port == -1) None else Some(port))
+        
+        uri.getScheme match {
+            case "postgres" => PostgreSQL
+            case "h2" => H2
+            case "mysql" => MySQL       
+            case _ => throw new Error("Unable to create DatabaseConnect for %s" format uri.getScheme)
+        } 
+    }
+    
+    private var dbConfig: Option[DatabaseComponent] = None
 
-    lazy val db = DB.dbConnect match {
-        case Some(dbc) => dbc.scheme match {
-            case MySQL.scheme => new MySQL(dbc)
-            case H2.scheme => new H2(dbc)
-            case PostgreSQL.scheme => new PostgreSQL(dbc)
-            case _ => throw new Error("Unknown DatabaseComponent.scheme: %s" format dbc.scheme)
-        }
+    lazy val db = DB.dbConfig match {
+        case Some(dbc) => dbc
         case None => throw new Error("Configure with: b.slick.DB(b.slick.DatabaseConnect)")
     }
 }
@@ -147,41 +156,48 @@ import scala.slick.driver.H2Driver
 import scala.slick.driver.MySQLDriver
 import scala.slick.driver.PostgresDriver
 
+case class DatabaseConnect(val user: String, val host: String, val path: String,
+        val pass: Option[String] = None, val port: Option[Int] = None)
+
 sealed trait DatabaseComponent extends b.common.Logger {
 
     // the Slick driver (e.g. H2 or MySQL)
     val driver: ExtendedDriver
 
-    // A database instance for which connections can be created.
-    // Encapsulates either a DataSource or parameters for DriverManager.getConnection().
-    lazy val handle: scala.slick.session.Database = {
-        logger.info("Creating database handle from: scheme=%s, url=%s, user=%s, pass=***" format (
-            dbConnect.scheme, dbConnect.jdbcUrl, dbConnect.user))
-        slick.session.Database.forURL(dbConnect.jdbcUrl, dbConnect.user, dbConnect.pass)
-    }
+    // connection info
+    val dbc: DatabaseConnect
+    val jdbcScheme: String
+    def defaultPort: Int
 
+    lazy val handle: scala.slick.session.Database = {
+		val jdbcUrl = "jdbc:%s://%s:%d%s" format (jdbcScheme, dbc.host, dbc.port.getOrElse(defaultPort), dbc.path)
+		logger.info("Creating database handle from: url=%s, user=%s, pass=***" format(jdbcUrl, dbc.user))
+        dbc.pass match {
+            case Some(p) => slick.session.Database.forURL(jdbcUrl, dbc.user, p)
+            case None => slick.session.Database.forURL(jdbcUrl, dbc.user)
+        }
+    }
+    
     // MySQL and H2 have different preferences on casing the table and column names.
     // H2 specifically prefers upper case
     def entityName(name: String): String = name
-    val scheme: String
-    val dbConnect: DatabaseConnect
 }
 
-object H2 { val scheme = "h2" }
-class H2(val dbConnect: DatabaseConnect) extends DatabaseComponent {
+case class H2(val dbc: DatabaseConnect) extends DatabaseComponent {
     val driver = H2Driver
-    val scheme = H2.scheme
+    val jdbcScheme = "h2"
+    def defaultPort = throw new Error("Please configure an explicit port for H2 database")
     override def entityName(name: String): String = name.toUpperCase()
 }
 
-object MySQL { val scheme = "mysql" }
-class MySQL(val dbConnect: DatabaseConnect) extends DatabaseComponent {
+case class MySQL(val dbc: DatabaseConnect) extends DatabaseComponent {
     val driver = MySQLDriver
-    val scheme = MySQL.scheme
+    val jdbcScheme = "mysql"
+    def defaultPort = 3306
 }
 
-object PostgreSQL { val scheme = "postgresql" }
-class PostgreSQL(val dbConnect: DatabaseConnect) extends DatabaseComponent {
+case class PostgreSQL(val dbc: DatabaseConnect) extends DatabaseComponent {
     val driver = PostgresDriver
-    val scheme = PostgreSQL.scheme
+    val jdbcScheme = "postgresql"
+    def defaultPort = 5432
 }
