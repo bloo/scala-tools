@@ -13,7 +13,7 @@ trait Tx extends TxBase with DefaultSlickSessionComponent
 
 object DB {
 
-    def apply[D <: DatabaseComponent](dbComp: D) {
+    def apply[D<:DatabaseComponent](dbComp: D) {
         DB.dbConfig = Some(dbComp)
         DB.db // init on 'apply' for fast-fail
     }
@@ -26,19 +26,21 @@ object DB {
         		if (userInfo.length > 1) Some(userInfo(1)) else None,
                 if (port == -1) None else Some(port))
         
-        uri.getScheme match {
-            case "postgres" => PostgreSQL
-            case "h2" => H2
-            case "mysql" => MySQL       
+        val dbc  = uri.getScheme match {
+            case "postgres" => PostgreSQL(dc)
+            case "h2" => H2(dc)
+            case "mysql" => MySQL(dc)
             case _ => throw new Error("Unable to create DatabaseConnect for %s" format uri.getScheme)
         } 
+        
+        apply(dbc)
     }
     
     private var dbConfig: Option[DatabaseComponent] = None
 
     lazy val db = DB.dbConfig match {
         case Some(dbc) => dbc
-        case None => throw new Error("Configure with: b.slick.DB(b.slick.DatabaseConnect)")
+        case None => throw new Error("Configure with: b.slick.DB(b.slick.DatabaseComponent)")
     }
 }
 
