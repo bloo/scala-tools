@@ -7,8 +7,10 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   val webjar_locator = "0.5"
   val webjar_coffeescript = "1.6.3"
   val bourbon_gem = "2.1.0"
+  val rhino = "1.7R4"
   val pool = "1.6"
   Seq(
+  "org.mozilla" % "rhino" % rhino,
   "commons-pool" % "commons-pool" % pool,
   "org.jruby" % "jruby-complete" % jruby,
   "me.n4u.sass" % "sass-gems" % sass, 

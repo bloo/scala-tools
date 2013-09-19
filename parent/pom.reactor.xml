@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>bloo</groupId>
+  <artifactId>bloo-reactor</artifactId>
+  <version>0</version>
+  <packaging>pom</packaging>
+
+  <distributionManagement>        
+      <repository>            
+          <id>internal</id>                        
+          <url>file:///Users/bloo/Dropbox/Public/mvn-repos</url>                      
+      </repository>           
+  </distributionManagement> 
+
+  <modules>
+    <module>parent</module>
+    <module>parent-testable</module>
+    <module>common</module>
+    <module>slick</module>
+    <module>specs2-core</module>
+    <module>specs2-api</module>
+    <module>specs2-slick</module>
+    <module>unfiltered-core</module>
+    <module>unfiltered-api-core</module>
+    <module>unfiltered-api-auth</module>
+    <module>unfiltered-wro</module>
+  </modules>
+  
+</project>
