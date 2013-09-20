@@ -9,6 +9,7 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   val bourbon_gem = "2.1.0"
   val rhino = "1.7R4"
   val pool = "1.6"
+  val closure = "v20130722"
   Seq(
   "org.mozilla" % "rhino" % rhino,
   "commons-pool" % "commons-pool" % pool,
@@ -17,13 +18,13 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   "org.webjars" % "webjars-locator" % webjar_locator,
   "org.webjars" % "coffee-script" % webjar_coffeescript,
   "nz.co.edmi" % "bourbon-gem-jar" % bourbon_gem,
+  "com.google.javascript" % "closure-compiler" % closure,
   "ro.isdc.wro4j" % "wro4j-core" % wro,
   "ro.isdc.wro4j" % "wro4j-extensions" % wro intransitive()
   // http://mvnrepository.com/artifact/ro.isdc.wro4j/wro4j-extensions/1.7.0
   //ExclusionRule(organization = "com.github.lltyk", name = "dojo-shrinksafe"),
   //ExclusionRule(organization = "com.github.sommeri", name = "less4j"),
   //ExclusionRule(organization = "com.google.code.gson", name = "gson"),
-  //ExclusionRule(organization = "com.google.javascript", name = "closure-compiler"),
   //ExclusionRule(organization = "commons-io", name = "commons-io"),
   //ExclusionRule(organization = "commons-pool", name = "commons-pool"),
   //ExclusionRule(organization = "javax.servlet", name = "servlet-api"),

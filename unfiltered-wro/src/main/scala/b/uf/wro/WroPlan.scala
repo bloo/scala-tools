@@ -20,7 +20,7 @@ import ro.isdc.wro.model.resource.processor.factory.SimpleProcessorsFactory
 import ro.isdc.wro.model.resource.processor.impl.css.CssImportPreProcessor
 import ro.isdc.wro.model.resource.processor.impl.css.CssUrlRewritingProcessor
 import ro.isdc.wro.model.resource.processor.impl.css.CssVariablesProcessor
-import ro.isdc.wro.model.resource.processor.impl.css.CssMinProcessor
+import ro.isdc.wro.model.resource.processor.impl.css.JawrCssMinifierProcessor
 import ro.isdc.wro.model.resource.processor.impl.js.JSMinProcessor
 import ro.isdc.wro.model.resource.processor.impl.js.SemicolonAppenderPreProcessor
 import ro.isdc.wro.model.resource.processor.ResourcePreProcessor
@@ -29,9 +29,11 @@ import ro.isdc.wro.util.StopWatch
 import b.common.Logger
 
 object Wro {
-    var gzip = true
+    var gzip = true // false
     var debug = false
-
+    var cssMin = false
+    var jsMin = false
+    
     /**
      * order here matters..
      * classes and traits are constructed super- to sub-class, left to right
@@ -73,7 +75,19 @@ class WroPlan(file: String) extends b.common.Logger {
     def addpost[T<:ResourcePostProcessor](processor: T) = post = post :+ processor
     
 	def plan: WroFilter = new WroFilter {
-	    
+
+        Wro.jsMin = !Wro.debug
+	    Wro.cssMin = !Wro.debug
+	
+	    val wroConfig = new WroConfiguration
+	    wroConfig setDebug Wro.debug
+	    wroConfig setDisableCache Wro.debug
+	    //wroConfig.setModelUpdatePeriod(if (Wro.debug) 10 else 0)
+	    wroConfig setGzipEnabled Wro.gzip
+	    wroConfig setJmxEnabled false
+	    wroConfig setIgnoreMissingResources false
+	    setConfiguration(wroConfig)
+
 	    val spf = new SimpleProcessorsFactory {
 	        logger info ("[%d] pre-processors for %s" format(pre.size, file))
 	        logger info ("[%d] post-processors for %s" format(post.size, file))
@@ -92,16 +106,8 @@ class WroPlan(file: String) extends b.common.Logger {
 	            }
 	        }
 	    }
-	
-	    val wroConfig = new WroConfiguration
-	    wroConfig setGzipEnabled Wro.gzip
-	    wroConfig setJmxEnabled false
-	    wroConfig setIgnoreMissingResources false
-	    wroConfig setDebug Wro.debug
-	    //wroConfig.setModelUpdatePeriod(if (Wro.debug) 10 else 0)
-	    wroConfig setDisableCache Wro.debug
+	    
 	    setWroManagerFactory(factory)
-	    setConfiguration(wroConfig)
     }
 }
 
@@ -131,11 +137,22 @@ trait CssPre extends CssUrlPre { this: WroPlan =>
 }
 
 trait CssMinPost { this: WroPlan => 
-    if (!Wro.debug) addpost(new CssMinProcessor)
+    if (Wro.cssMin) addpost(new JawrCssMinifierProcessor)
 }
 
+// keeps throwing:
+//ro.isdc.wro.WroRuntimeException: Compilation has errors: [JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 57 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 245 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 5066 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 8373 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10128 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10129 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10131 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10132 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10148 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10296 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 11588 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 11605 : 0]
+//trait JsGCMinPost { this: WroPlan =>
+//    if (Wro.jsMin) {
+//		  import ro.isdc.wro.extensions.processor.js.GoogleClosureCompressorProcessor
+//        val m = new GoogleClosureCompressorProcessor
+//        m setEncoding "UTF8"
+//        addpost(m)
+//    }
+//}
+
 trait JsMinPost { this: WroPlan =>
-    if (!Wro.debug) addpost(new JSMinProcessor)
+    if (Wro.jsMin) addpost(new JSMinProcessor)
 }
 
 trait JsPre { this: WroPlan =>

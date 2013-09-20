@@ -95,6 +95,7 @@
 		<bourbon-gem.version>2.1.0</bourbon-gem.version>
 		<commons-pool.version>1.6</commons-pool.version>
 		<rhino.version>1.7R4</rhino.version>
+		<closure.version>v20130722</closure.version>
 
 		<!-- specs2-core -->
 		<junit.version>4.8.2</junit.version>
@@ -193,6 +194,11 @@
 				<version>${lift-json.version}</version>
 			</dependency>
 
+			<dependency>
+				<groupId>com.google.javascript</groupId>
+				<artifactId>closure-compiler</artifactId>
+				<version>${closure.version}</version>
+			</dependency>
 			<dependency>
 				<groupId>org.mozilla</groupId>
 				<artifactId>rhino</artifactId>
