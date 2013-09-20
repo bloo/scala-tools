@@ -18,7 +18,7 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   "org.webjars" % "webjars-locator" % webjar_locator,
   "org.webjars" % "coffee-script" % webjar_coffeescript,
   "nz.co.edmi" % "bourbon-gem-jar" % bourbon_gem,
-  "com.google.javascript" % "closure-compiler" % closure,
+  //"com.google.javascript" % "closure-compiler" % closure,
   "ro.isdc.wro4j" % "wro4j-core" % wro,
   "ro.isdc.wro4j" % "wro4j-extensions" % wro intransitive()
   // http://mvnrepository.com/artifact/ro.isdc.wro4j/wro4j-extensions/1.7.0
