@@ -22,13 +22,23 @@ abstract class Model[T <: BaseModel](tableName: String)
 
     def findOption(id: Long)(implicit s: Session) = tableToQuery(this).where(_.id === id).map(_*).firstOption
 
-    def list(page: Int = 0, pageSize: Int = 10, orderBy: Int = 1, filter: String = "%")(implicit s: Session): Page[T] = {
-        val q = tableToQuery(this)
+    def page(page: Int = 0, pageSize: Int = 10)(implicit s: Session): Page[T] = {
+        val values = list(page, Some(pageSize))
         val offset = pageSize * page
+        Page(values, page, pageSize, offset, values.size)
+    }
+
+    def all(offset: Option[Int] = None, limit: Option[Int] = None)(implicit s: Session): List[T] =  {
+        list(offset.getOrElse(0), limit)
+    }
+    
+    def list(page: Int = 0, pageSize: Option[Int] = None)(implicit s: Session): List[T] = {
+        val q = tableToQuery(this)
         val total = q.length.run // System.currentTimeMillis() / 1000
-        //      import scala.slick.lifted._
-        val values = q.drop(offset).take(pageSize).map(_.*).list
-        Page(values, page, pageSize, offset, total)
+        pageSize match {
+            case Some(ps) => q.drop(ps*page).take(ps).map(_.*).list
+            case None => q.map(_.*).list
+        }
         // add filter
         //.sortByRuntimeValue(_.column _, orderBy)
         //      Page(values, page, pageSize, offset, total)

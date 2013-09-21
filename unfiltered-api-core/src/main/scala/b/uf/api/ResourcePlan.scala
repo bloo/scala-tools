@@ -67,11 +67,13 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
     //
     def authorizeSave[X](auth: Option[T], req: HttpRequest[X]): Boolean
     def authorizeUpdate[X](auth: Option[T], req: HttpRequest[X], id: String): Boolean
+    def authorizeGetAll[X](auth: Option[T], req: HttpRequest[X]): Boolean
     def authorizeGet[X](auth: Option[T], req: HttpRequest[X], id: String): Boolean
     def authorizeDelete[X](auth: Option[T], req: HttpRequest[X], id: String): Boolean
     
     // resource handlers
     //
+    def findAll(offset: Option[Int] = None, limit: Option[Int] = None): List[R]
     def find(id: String): Option[R]
     def save(resource: R): Option[R]
     def update(original: R, resource: R): Option[R]
@@ -81,8 +83,13 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
     //
     def deserialize[X](auth: Option[T], req: HttpRequest[X], data: String): Option[R]
     def serialize(auth: Option[T], resource: R): String = toJson(resource)
+    def serialize(auth: Option[T], resources: List[R]): String = toJson(resources)
         
     private implicit def resourceToResponse(authAndResource: (Option[T],R)): ResponseFunction[Any] = {
+        JsonContent ~> ResponseString(serialize(authAndResource._1, authAndResource._2))
+    }
+        
+    private implicit def resourcesToResponse(authAndResource: (Option[T],List[R])): ResponseFunction[Any] = {
         JsonContent ~> ResponseString(serialize(authAndResource._1, authAndResource._2))
     }
     
@@ -150,6 +157,17 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
             else find(id) match {
                 case Some(found) => Ok ~> (auth,found)
                 case _ => ErrGetCannotFind
+            }
+        }
+
+        case req @ GET(Path(p)) if p == PathPrefix => {
+            if (!authorizeGetAll(auth, req)) reject(auth, req, ErrGetUnauthorized)
+            object Offset extends Params.Extract("offset", Params.first ~> Params.int)
+            object Limit extends Params.Extract("limit", Params.first ~> Params.int)
+            req match {
+                case Params(Offset(o) & Limit(l)) => Ok ~> (auth,findAll(Some(o),Some(l)))
+                case Params(Limit(l)) => Ok ~> (auth,findAll(None,Some(l)))
+                case _ => Ok ~> (auth,findAll())
             }
         }
             

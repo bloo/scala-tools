@@ -27,13 +27,32 @@ object Scalate {
 }
 
 trait Scalate {
+    
+    var prefix: String = ""
+        
+    def t[A](path: String, req: HttpRequest[A]): ResponseWriter =
+        t(path, path.replaceAll("/", " ").capitalize, req)
 
-    def layout[A](template: String, req: HttpRequest[A], attributes: (String, Any)*): ResponseWriter = {
-        ScalateTemplate(template + Scalate.templateExt) respond (req, attributes: _*)
-    }
+    def t[A](path: String, title: String, req: HttpRequest[A]): ResponseWriter =
+        r(path, req, "title" -> title)
 
-//    def engine = ScalateTemplate.engine
-//    def contextBuilder = ScalateTemplate.renderContext
+    def t[A](path: String, title: String, req: HttpRequest[A], attribute: (String, Any)): ResponseWriter =
+        r(path, req, "title" -> title, attribute)
+
+    def t[A](path: String, title: String, req: HttpRequest[A], attributes: (String, Any)*): ResponseWriter =
+        r(path, req, (List("title" -> title) ::: attributes.toList): _*)
+        
+    def r[A](path: String, req: HttpRequest[A]): ResponseWriter =
+        ScalateTemplate(prefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req)
+
+    def r[A](path: String, req: HttpRequest[A], attribute: (String, Any)): ResponseWriter =
+        ScalateTemplate(prefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, attribute)
+
+    def r[A](path: String, req: HttpRequest[A], attributes: (String, Any)*): ResponseWriter =
+        ScalateTemplate(prefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, attributes: _*)
+
+    //    def engine = ScalateTemplate.engine
+    //    def contextBuilder = ScalateTemplate.renderContext
 }
 
 object ScalateTemplate {
@@ -74,7 +93,7 @@ class ScalateTemplate(val template: String) extends b.common.Logger {
                 engine.layout(template, context)
             } catch {
                 case e: Throwable => {
-                    logger error("Unable to render Scalate template for request", e)
+                    logger error ("Unable to render Scalate template for request", e)
                     throw e
                 }
             }

@@ -19,6 +19,7 @@ class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "session
     def authorizeSave[A](auth: Option[T], req: HttpRequest[A]): Boolean = permIfAuth(auth)
     def authorizeDelete[A](auth: Option[T], req: HttpRequest[A], id: String): Boolean = permIfAuth(auth)
     def authorizeGet[A](auth: Option[T], req: HttpRequest[A], id: String): Boolean = permIfAuth(auth)
+    def authorizeGetAll[A](auth: Option[T], req: HttpRequest[A]): Boolean = false
     
     // no updating, ever
 	//
@@ -35,6 +36,8 @@ class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "session
 	        case _ => None
         }
     }
+
+    def findAll(offset: Option[Int], limit: Option[Int]): List[S] = Nil
     
     // find our user's session, ignore 'id', as it's "local"
     //
