@@ -47,7 +47,7 @@ object ResourcePlan {
     }
 }
 
-abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) extends Plan with Logger {
+abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String, MaxPageSize: Option[Int] = None) extends Plan with Logger {
 	this: ResourceAuthComponent[T] =>
     
 	lazy val PathConfig = (Version, Group, Resource)
@@ -73,7 +73,8 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
     
     // resource handlers
     //
-    def findAll(offset: Option[Int] = None, limit: Option[Int] = None): List[R]
+    def findAll[X](req: HttpRequest[X], page: Option[Int] = None, size: Option[Int] = None): List[R]
+    def count[X](req: HttpRequest[X]) : Int
     def find(id: String): Option[R]
     def save(resource: R): Option[R]
     def update(original: R, resource: R): Option[R]
@@ -91,6 +92,10 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
         
     private implicit def resourcesToResponse(authAndResource: (Option[T],List[R])): ResponseFunction[Any] = {
         JsonContent ~> ResponseString(serialize(authAndResource._1, authAndResource._2))
+    }
+        
+    private implicit def intToResponse(authAndResource: (Option[T],Int)): ResponseFunction[Any] = {
+        JsonContent ~> ResponseString("""{"count": %d}""" format authAndResource._2)
     }
     
     private implicit def reqToResource[X](req: HttpRequest[X]): String = {
@@ -162,12 +167,31 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String) 
 
         case req @ GET(Path(p)) if p == PathPrefix => {
             if (!authorizeGetAll(auth, req)) reject(auth, req, ErrGetUnauthorized)
-            object Offset extends Params.Extract("offset", Params.first ~> Params.int)
-            object Limit extends Params.Extract("limit", Params.first ~> Params.int)
+            object Count extends Params.Extract("count", Params.first ~> Params.nonempty)
+            object Page extends Params.Extract("page", Params.first ~> Params.int)
+            object Size extends Params.Extract("size", Params.first ~> Params.int)
             req match {
-                case Params(Offset(o) & Limit(l)) => Ok ~> (auth,findAll(Some(o),Some(l)))
-                case Params(Limit(l)) => Ok ~> (auth,findAll(None,Some(l)))
-                case _ => Ok ~> (auth,findAll())
+                case Params(Count(flag)) if (flag == "true" | flag == "TRUE") => Ok ~> (auth,count(req))
+                case Params(Page(p) & Size(s)) => {
+                    val sz = MaxPageSize match {
+                        case Some(max) => if (max>s) s else max
+                        case None => s
+                    }
+                    Ok ~> (auth,findAll(req, Some(p),Some(sz)))
+                }
+                case Params(Size(s)) => {
+                    val sz = MaxPageSize match {
+                        case Some(max) => if (max>s) s else max
+                        case None => s
+                    }
+                    Ok ~> (auth,findAll(req, None,Some(sz)))
+                }
+                case _ => {
+                	MaxPageSize match {
+                        case Some(max) => Ok ~> (auth,findAll(req, None,Some(max)))
+                        case None => Ok ~> (auth,findAll(req))
+                    }
+                }
             }
         }
             

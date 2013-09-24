@@ -4,8 +4,6 @@ import org.joda.time.DateTime
 
 import b.slick.ql._
 
-case class Page[T](values: List[T], page: Int, pageSize: Int, offset: Int, total: Int)
-
 abstract class Model[T <: BaseModel](tableName: String)
     extends Table[T](DB.db.entityName(tableName)) {
 
@@ -22,26 +20,20 @@ abstract class Model[T <: BaseModel](tableName: String)
 
     def findOption(id: Long)(implicit s: Session) = tableToQuery(this).where(_.id === id).map(_*).firstOption
 
-    def page(page: Int = 0, pageSize: Int = 10)(implicit s: Session): Page[T] = {
-        val values = list(page, Some(pageSize))
-        val offset = pageSize * page
-        Page(values, page, pageSize, offset, values.size)
+    type FilterAndSort = Query[this.type,_] => Query[this.type,_]
+    
+    def list(page: Option[Int] = None, pageSize: Option[Int] = None,
+            query: FilterAndSort = {q=>q})(implicit s: Session): List[T] = {
+
+        val q = query(tableToQuery(this))
+        (pageSize match {
+            case Some(ps) => q.drop(ps*(page.getOrElse(1)-1)).take(ps)
+            case None => q
+        }).map(_.*).list
     }
 
-    def all(offset: Option[Int] = None, limit: Option[Int] = None)(implicit s: Session): List[T] =  {
-        list(offset.getOrElse(0), limit)
-    }
-    
-    def list(page: Int = 0, pageSize: Option[Int] = None)(implicit s: Session): List[T] = {
-        val q = tableToQuery(this)
-        val total = q.length.run // System.currentTimeMillis() / 1000
-        pageSize match {
-            case Some(ps) => q.drop(ps*page).take(ps).map(_.*).list
-            case None => q.map(_.*).list
-        }
-        // add filter
-        //.sortByRuntimeValue(_.column _, orderBy)
-        //      Page(values, page, pageSize, offset, total)
+    def count(query: FilterAndSort = {q=>q})(implicit s: Session) = {
+        query(tableToQuery(this)).length.run
     }
 
     def insert(entity: T)(implicit s: Session) = autoInc.insert(entity)
@@ -54,9 +46,6 @@ abstract class Model[T <: BaseModel](tableName: String)
     def delete(entity: T)(implicit s: Session) = queryToDeleteInvoker(
         tableToQuery(this).where(_.id === entity.id)).delete
 
-    def count(implicit s: Session) = Query(tableToQuery(this).length).first
-
-    def count(filter: Model[T] with Table[T] => Boolean)(implicit s: Session) = Query(tableToQuery(this).filter(filter).length).first
 
 }
 

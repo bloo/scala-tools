@@ -129,7 +129,7 @@ trait Scss extends CssUrlPre { this: WroPlan =>
 
 trait CssUrlPre { this: WroPlan =>
     addpre(new CssImportPreProcessor)
-    addpre(new CssUrlRewritingProcessor)
+//    addpre(new CssUrlRewritingProcessor)
 }
 
 trait CssPre extends CssUrlPre { this: WroPlan =>

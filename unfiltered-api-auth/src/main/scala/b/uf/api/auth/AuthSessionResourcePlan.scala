@@ -37,7 +37,8 @@ class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "session
         }
     }
 
-    def findAll(offset: Option[Int], limit: Option[Int]): List[S] = Nil
+    def findAll[A](req: HttpRequest[A], page: Option[Int], size: Option[Int]): List[S] = Nil
+    def count[A](req: HttpRequest[A]): Int = 0
     
     // find our user's session, ignore 'id', as it's "local"
     //
