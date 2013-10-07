@@ -11,7 +11,7 @@ trait TxRollback extends b.slick.Tx {
     type S = Session
     object tx extends AroundOutside[S] {
         var sess: Option[S] = None
-    	def around[R : AsResult](a: =>R): Result = doThenRollback {s => {sess = Some(s); AsResult(a)}}
+    	def around[R : AsResult](a: =>R): Result = tryThenRollback {s => {sess = Some(s); AsResult(a)}}
     	def outside: S = sess.get
     }
 }

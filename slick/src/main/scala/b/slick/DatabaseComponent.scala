@@ -94,7 +94,7 @@ trait TxBase extends b.common.Logger { this: SlickSessionComponent =>
         } finally s.close()
     }
 
-    def doThenRollback[T](f: RWSession => T): T = {
+    def tryThenRollback[T](f: RWSession => T): T = {
         val s = sessionProvider.createReadWriteSession(db.handle)
         try {
             s.withTransaction {
@@ -104,7 +104,7 @@ trait TxBase extends b.common.Logger { this: SlickSessionComponent =>
                     s.rollback()
                 }
             }
-        }
+        } finally s.close()
     }
 
     def readWrite[T](attempts: Int)(f: RWSession => T): T = {

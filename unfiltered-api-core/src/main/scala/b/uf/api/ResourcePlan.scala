@@ -49,7 +49,7 @@ object ResourcePlan {
 
 abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String, MaxPageSize: Option[Int] = None) extends Plan with Logger {
 	this: ResourceAuthComponent[T] =>
-    
+    	
 	lazy val PathConfig = (Version, Group, Resource)
     lazy val PathPrefix = "/api/%s/%s/%s" format("v"+Version, Group, Resource)
 
@@ -64,7 +64,7 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String, 
     }
     
     // authorization testers
-    //
+    //	
     def authorizeSave[X](auth: Option[T], req: HttpRequest[X]): Boolean
     def authorizeUpdate[X](auth: Option[T], req: HttpRequest[X], id: String): Boolean
     def authorizeGetAll[X](auth: Option[T], req: HttpRequest[X]): Boolean
@@ -73,7 +73,7 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String, 
     
     // resource handlers
     //
-    def findAll[X](req: HttpRequest[X], page: Option[Int] = None, size: Option[Int] = None): List[R]
+    def query[X](req: HttpRequest[X], page: Option[Int] = None, size: Option[Int] = None): List[R]
     def count[X](req: HttpRequest[X]) : Int
     def find(id: String): Option[R]
     def save(resource: R): Option[R]
@@ -111,13 +111,14 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String, 
     }
 
     def intent = {
+        
         case req @ Path(p) if p.startsWith(PathPrefix) => req match {
             case Accepts.Json(_) => authorize(authService.authenticate(req))(req)
             case _ => NotAcceptable ~> ResponseString("You must accept application/json")
         }
         case _ => Pass
 	}
-
+    
     private def authorize(auth: Option[T]): Plan.Intent = {
 
 	    // POST request must contain JSON
@@ -177,19 +178,19 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, Resource: String, 
                         case Some(max) => if (max>s) s else max
                         case None => s
                     }
-                    Ok ~> (auth,findAll(req, Some(p),Some(sz)))
+                    Ok ~> (auth,query(req, Some(p),Some(sz)))
                 }
                 case Params(Size(s)) => {
                     val sz = MaxPageSize match {
                         case Some(max) => if (max>s) s else max
                         case None => s
                     }
-                    Ok ~> (auth,findAll(req, None,Some(sz)))
+                    Ok ~> (auth,query(req, None,Some(sz)))
                 }
                 case _ => {
                 	MaxPageSize match {
-                        case Some(max) => Ok ~> (auth,findAll(req, None,Some(max)))
-                        case None => Ok ~> (auth,findAll(req))
+                        case Some(max) => Ok ~> (auth,query(req, None,Some(max)))
+                        case None => Ok ~> (auth,query(req))
                     }
                 }
             }

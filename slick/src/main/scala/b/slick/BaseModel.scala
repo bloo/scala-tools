@@ -13,7 +13,7 @@ abstract class Model[T <: BaseModel](tableName: String)
 
     def * : scala.slick.lifted.ColumnBase[T]
 
-    def forInsert: scala.slick.lifted.ColumnBase[T]
+    def forInsert: scala.slick.lifted.ColumnBase[T] = *
     def autoInc = forInsert returning *
 
     def find(id: Long)(implicit s: Session) = tableToQuery(this).where(_.id === id).map(_*).first

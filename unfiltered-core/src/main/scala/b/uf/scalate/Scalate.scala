@@ -28,7 +28,11 @@ object Scalate {
 
 trait Scalate {
     
-    var prefix: String = ""
+    def global(attr: (String,Any)) = globals = globals :+ attr
+    def prefix(pre: String) = pathPrefix = pre
+    
+    private var globals: List[(String,Any)] = Nil
+    private var pathPrefix: String = ""
         
     def t[A](path: String, req: HttpRequest[A]): ResponseWriter =
         t(path, path.replaceAll("/", " ").capitalize, req)
@@ -43,13 +47,13 @@ trait Scalate {
         r(path, req, (List("title" -> title) ::: attributes.toList): _*)
         
     def r[A](path: String, req: HttpRequest[A]): ResponseWriter =
-        ScalateTemplate(prefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req)
+        ScalateTemplate(pathPrefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, globals: _*)
 
     def r[A](path: String, req: HttpRequest[A], attribute: (String, Any)): ResponseWriter =
-        ScalateTemplate(prefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, attribute)
+        ScalateTemplate(pathPrefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, (attribute :: globals): _*)
 
     def r[A](path: String, req: HttpRequest[A], attributes: (String, Any)*): ResponseWriter =
-        ScalateTemplate(prefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, attributes: _*)
+        ScalateTemplate(pathPrefix + "/" + path.replaceAll("^/", "") + Scalate.templateExt) respond (req, (attributes.toList ::: globals): _*)
 
     //    def engine = ScalateTemplate.engine
     //    def contextBuilder = ScalateTemplate.renderContext
