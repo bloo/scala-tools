@@ -9,12 +9,20 @@ import b.common.Logger
 import org.apache.commons.io.IOUtils
 import java.io.StringWriter
 
-trait ResourcePlanSpecBase[R, T, P <: b.uf.api.ResourcePlan[T,R]]
+trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
     extends Specification with Mockito with Served with Logger {
 
+    // tuple type representing the user/pass credentials of whomever 
+    // is requesting each http client call during the specs test
+    //
     type Requester = (String, String)
-    def validUsers: List[Requester]
+
+    // needs to be overridden in spec to provide actual instance of ResourcePlan
+    //
     def resourcePlan: P
+    
+    // get our path prefix from the ResourcePlan instance
+    //
     def pathPrefix: String = {
 //        val cfg = pathConfig
         val cfg = resourcePlan.PathConfig
@@ -54,6 +62,19 @@ trait ResourcePlanSpecBase[R, T, P <: b.uf.api.ResourcePlan[T,R]]
             case (status, _, _, _) => (status, None)
         }
     }
+    
+    private def _reqToStatusAndResults(req: dispatch.classic.Request)(implicit mf: Manifest[R]): Handler[(Int,Option[List[R]])] = {
+        req >:> Predef.identity apply {
+            case (status, _, Some(entity), _) if status == 200 | status == 201 => {
+		    	val sw = new StringWriter
+		    	IOUtils.copy(entity.getContent, sw)
+		    	val jsonOut = sw.toString
+		    	logger info "JSON ouput" + jsonOut
+                (status, Some(fromJson[List[R]](jsonOut)))
+            }
+            case (status, _, _, _) => (status, None)
+        }
+    }
 
     private def _reqToStatus(req: dispatch.classic.Request): Handler[Int] = {
 	    req >:> Predef.identity apply { case (status,_,_,_) => status }
@@ -63,24 +84,31 @@ trait ResourcePlanSpecBase[R, T, P <: b.uf.api.ResourcePlan[T,R]]
 
     def xpost(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester] = None)
     	= xhttp(_reqToStatusAndResult(newReq(requester) << (json)))
-   	def post(json: String)(implicit mf: Manifest[R], requester: Option[Requester] = None): R = {
+   	def post(json: String)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
         val resultJson = http(newReq(requester) << (json) as_str)
         fromJson[R](resultJson)
     }
 
-    def xget(id: String)(implicit mf: Manifest[R], requester: Option[Requester] = None): (Int,Option[R])
+    def xget(id: String)(implicit mf: Manifest[R], requester: Option[Requester]): (Int,Option[R])
     	= xhttp(_reqToStatusAndResult(newReq(id, requester)))
-    def get(id: String)(implicit mf: Manifest[R], requester: Option[Requester] = None): R = {
+    def get(id: String)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
         val resultJson = http(newReq(id, requester) as_str)
         fromJson[R](resultJson)
     }
 
-    def xdelete(id: String)(implicit requester: Option[Requester] = None) = xhttp(_reqToStatus(newReq(id, requester).DELETE))
-    def delete(id: String)(implicit requester: Option[Requester] = None) = http(newReq(id, requester).DELETE as_str)
+    def xget()(implicit mf: Manifest[R], requester: Option[Requester]): (Int,Option[List[R]])
+    	= xhttp(_reqToStatusAndResults(newReq(requester)))
+    def get()(implicit mf: Manifest[R], requester: Option[Requester]): List[R] = {
+        val resultJson = http(newReq(requester) as_str)
+        fromJson[List[R]](resultJson)
+    }
 
-    def xput(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester] = None)
+    def xdelete(id: String)(implicit requester: Option[Requester]) = xhttp(_reqToStatus(newReq(id, requester).DELETE))
+    def delete(id: String)(implicit requester: Option[Requester]) = http(newReq(id, requester).DELETE as_str)
+
+    def xput(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester])
     	= xhttp(_reqToStatusAndResult(newReq(id, requester) <<< (json)))
-    def put(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester] = None): R = {
+    def put(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
         val resultJson = http(newReq(id, requester) <<< (json) as_str)
         fromJson[R](resultJson)
     }    

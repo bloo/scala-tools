@@ -16,29 +16,29 @@ class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "session
     
 	// we can get, create, or delete a session only if we've been authenticated
 	//
-    def authorizeSave[A](auth: Option[T], req: HttpRequest[A]): Boolean = permIfAuth(auth)
-    def authorizeDelete[A](auth: Option[T], req: HttpRequest[A], id: String): Boolean = permIfAuth(auth)
-    def authorizeGet[A](auth: Option[T], req: HttpRequest[A], id: String): Boolean = permIfAuth(auth)
-    def authorizeGetAll[A](auth: Option[T], req: HttpRequest[A]): Boolean = false
+    def authorizeSave(ctx: Context): Boolean = permIfAuth(ctx auth)
+    def authorizeDelete(ctx: Context): Boolean = permIfAuth(ctx auth)
+    def authorizeGet(ctx: Context): Boolean = permIfAuth(ctx auth)
+    def authorizeGetAll(ctx: Context): Boolean = false
     
     // no updating, ever
 	//
-    def authorizeUpdate[A](auth: Option[T], req: HttpRequest[A], id: String): Boolean = false
+    def authorizeUpdate(ctx: Context): Boolean = false
 
     // this is called when we're prepping for 'save' - if we're authenticated, create the session
     // here and when we get to 'save', we're just going to return this created session resource
     //
-    def deserialize[A](auth: Option[T], req: HttpRequest[A], data: String): Option[S] = {
+    def deserialize(ctx: Context, data: String): Option[S] = {
     	case class LoginRequest(val remember: Boolean)
         val lr = fromJson[LoginRequest](data)
-        auth match {
+        ctx auth match {
 	        case Some(acct) => Some(sessionService.create(acct, lr.remember))
 	        case _ => None
         }
     }
 
-    def query[A](req: HttpRequest[A], page: Option[Int], size: Option[Int]): List[S] = Nil
-    def count[A](req: HttpRequest[A]): Int = 0
+    def query(ctx: Context, page: Option[Int], size: Option[Int]): List[S] = Nil
+    def count(ctx: Context): Int = 0
     
     // find our user's session, ignore 'id', as it's "local"
     //
