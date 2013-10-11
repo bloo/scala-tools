@@ -45,6 +45,14 @@
 			<groupId>commons-io</groupId>
 			<artifactId>commons-io</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>org.fusesource.scalate</groupId>
+			<artifactId>scalate-core_${sv}</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.fusesource.scalamd</groupId>
+			<artifactId>scalamd_${sv}</artifactId>
+		</dependency>
 	</dependencies>
 	
 </project>

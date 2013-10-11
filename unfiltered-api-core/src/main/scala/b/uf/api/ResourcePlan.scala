@@ -15,6 +15,7 @@ import unfiltered.response._
 import unfiltered.response.ResponseString
 import unfiltered.response.Unauthorized
 import b.common.Logger
+import b.uf.errors._
 
 object ResourcePlan {
     
@@ -66,16 +67,16 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, ResourcePath: Stri
     // authorization testers
     //	
     def authorizeSave(ctx: Context): Boolean
-    def authorizeUpdate(ctx: Context): Boolean
+    def authorizeUpdate(ctx: Context, resourceId: String): Boolean
     def authorizeGetAll(ctx: Context): Boolean
-    def authorizeGet(ctx: Context): Boolean
-    def authorizeDelete(ctx: Context): Boolean
+    def authorizeGet(ctx: Context, resourceId: String): Boolean
+    def authorizeDelete(ctx: Context, resourceId: String): Boolean
     
     // resource handlers
     //
-    def query(ctx: Context, page: Option[Int] = None, size: Option[Int] = None): List[R]
-    def count(ctx: Context) : Int
-    def find(rid: String): Option[R]
+    def query(ctx: Context, qp: QueryParams): List[R]
+    def count(ctx: Context, qp: QueryParams) : Int
+    def find(resourceId: String): Option[R]
     def save(resource: R): Option[R]
     def update(original: R, resource: R): Option[R]
     def delete(resource: R): Boolean
@@ -104,18 +105,11 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, ResourcePath: Stri
     	sw.toString
     }
 
+	case class ResourceErrorJson(val code: Int, val messages: Seq[String])
     private implicit def errorToJson(error: ErrorResponse): ResponseFunction[Any] = {
-        val re = ResourceError(error.code, error.message)
+        val re = ResourceErrorJson(error.code, error.messages)
         val json = toJson(re)
     	error.status ~> ResponseString(json)
-    }
-
-    private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
-        val ctx = Context(req, authService.authenticate(req), params, params.get("resource_id"))
-        req match {
-            case Accepts.Json(_) => authorize(ctx)(req)
-            case _ => NotAcceptable ~> ResponseString("You must accept application/json")
-        }
     }
     
     def intent = {
@@ -123,127 +117,127 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, ResourcePath: Stri
    			PathPrefix -> dointent _,
    			PathPrefix+"/:resource_id" -> dointent _
     	)
-    	
-//        case req @ Path(p) if p.startsWith(PathPrefix) => req match {
-//            case Accepts.Json(_) => authorize(authService.authenticate(req))(req)
-//            case _ => NotAcceptable ~> ResponseString("You must accept application/json")
-//        }
-//        case _ => Pass
 	}
     
-    case class Context(req: HttpRequest[_], auth: Option[T], pathIds: Map[String,String], resourceId: Option[String])
+    case class Context(req: HttpRequest[_], auth: Option[T], pathIds: Map[String,String])
+    case class QueryParams(page: Option[Int] = None, size: Option[Int])
 
-    private def authorize(ctx: Context): Plan.Intent = {
-
-    	ctx.resourceId match {
-    	
-    	    case Some(rid) => {
-    	        
-		    	// PUT request must contain JSON
-		    	//
-		        case req @ PUT(Path(_) & RequestContentType("application/json")) => {
-		            if (!authorizeUpdate(ctx)) reject(ctx, ErrPutUnauthorized)
-		            else {
-		                find(rid) match {
-			                case Some(original) => {			                    
-			                    deserialize(ctx, req) match {
-			                        case Some(toUpdate) => {
-			                            update(original, toUpdate) match {
-			                                case Some(updated) => Ok ~> (ctx,updated)
-			                                case _ => ErrPutCannotUpdate
-			                            }
-			                        }
-			                        case _ => ErrPutCannotDeser
-			                    }
-			                }
-			                case _ => ErrPutCannotFind
-		                }
-		            }
-		        }
-		
-		        // GET with id requests single resource
-		        //
-		        case req @ GET(Path(_)) => {
-		            if (!authorizeGet(ctx)) reject(ctx, ErrGetUnauthorized)
-		            else find(rid) match {
-		                case Some(found) => Ok ~> (ctx,found)
-		                case _ => ErrGetCannotFind
-		            }
-		        }    	     
-		        
-		        // DELETE resource by id
-		        //
-		        case req @ DELETE(Path(_)) => {
-		            if (!authorizeDelete(ctx)) reject(ctx, ErrDeleteUnauthorized)
-		            else find(rid) match {
-		                case Some(toDelete) => {
-		                    if (delete(toDelete)) Ok
-		                    else ErrDeleteCannotDelete
-		                }
-		                case _ => ErrDeleteCannotFind
-		            }
-		        }
-		        
-		        // fall through
-		        //
-		        case _ => fail(ctx)
-    	    }
-    	    
-    	    case None => {
-
-			    // POST request must contain JSON
-			    //
-		    	case req @ POST(Path(_) & RequestContentType("application/json")) => {
-		            if (!authorizeSave(ctx)) reject(ctx, ErrPostUnauthorized)
-		            else deserialize(ctx, req) match {
-			                case Some(toSave) => {
-			                    save(toSave) match {
-			                        case Some(saved) => Created ~> (ctx,saved)
-			                        case _ => ErrPostCannotCreate
-			                    }
-			                }
-			                case _ => ErrPostCannotDeser
-		            	}
-		        }
-		    	
-		    	// GET w/o id is a query
-		    	//
-		        case req @ GET(_) => {
-		            if (!authorizeGetAll(ctx)) reject(ctx, ErrGetUnauthorized)
-		            object Count extends Params.Extract("count", Params.first ~> Params.nonempty)
-		            object Page extends Params.Extract("page", Params.first ~> Params.int)
-		            object Size extends Params.Extract("size", Params.first ~> Params.int)
-		            req match {
-		                case Params(Count(flag)) if (flag == "true" | flag == "TRUE") => Ok ~> (ctx,count(ctx))
-		                case Params(Page(p) & Size(s)) => {
-		                    val sz = MaxPageSize match {
-		                        case Some(max) => if (max>s) s else max
-		                        case None => s
-		                    }
-		                    Ok ~> (ctx,query(ctx, Some(p),Some(sz)))
-		                }
-		                case Size(s) => {
-		                    val sz = MaxPageSize match {
-		                        case Some(max) => if (max>s) s else max
-		                        case None => s
-		                    }
-		                    Ok ~> (ctx,query(ctx, None,Some(sz)))
-		                }
-		                case _ => {
-		                	MaxPageSize match {
-		                        case Some(max) => Ok ~> (ctx,query(ctx, None,Some(max)))
-		                        case None => Ok ~> (ctx,query(ctx))
-		                    }
-		                }
-		            }
-		        } 
-	
-		        // fall through
-		        //
-		        case _ => fail(ctx)
-    	    }
-    	}
+    private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
+        val ctx = Context(req, authService.authenticate(req), params)
+        req match {
+            case Accepts.Json(_) => authorize(ctx, params.get("resource_id"))(req)
+            case _ => NotAcceptable ~> ResponseString("You must accept application/json")
+        }
     }
+
+    private def authorize(ctx: Context, resourceId: Option[String]): Plan.Intent = resourceId match {
+		case Some(rid) => {
+	        
+	    	// PUT request must contain JSON
+	    	//
+	        case req @ PUT(Path(_) & RequestContentType("application/json")) => {
+	            if (!authorizeUpdate(ctx, rid)) reject(ctx, ErrPutUnauthorized)
+	            else {
+	                find(rid) match {
+		                case Some(original) => {			                    
+		                    deserialize(ctx, req) match {
+		                        case Some(toUpdate) => {
+		                            update(original, toUpdate) match {
+		                                case Some(updated) => Ok ~> (ctx,updated)
+		                                case _ => ErrPutCannotUpdate
+		                            }
+		                        }
+		                        case _ => ErrPutCannotDeser
+		                    }
+		                }
+		                case _ => ErrPutCannotFind
+	                }
+	            }
+	        }
+	
+	        // GET with id requests single resource
+	        //
+	        case req @ GET(Path(_)) => {
+	            if (!authorizeGet(ctx, rid)) reject(ctx, ErrGetUnauthorized)
+	            else find(rid) match {
+	                case Some(found) => Ok ~> (ctx,found)
+	                case _ => ErrGetCannotFind
+	            }
+	        }    	     
+	        
+	        // DELETE resource by id
+	        //
+	        case req @ DELETE(Path(_)) => {
+	            if (!authorizeDelete(ctx, rid)) reject(ctx, ErrDeleteUnauthorized)
+	            else find(rid) match {
+	                case Some(toDelete) => {
+	                    if (delete(toDelete)) Ok
+	                    else ErrDeleteCannotDelete
+	                }
+	                case _ => ErrDeleteCannotFind
+	            }
+	        }
+	        
+	        // fall through
+	        //
+	        case _ => fail(ctx)
+	    }
+	    
+	    case None => {
+
+		    // POST request must contain JSON
+		    //
+	    	case req @ POST(Path(_) & RequestContentType("application/json")) => {
+	            if (!authorizeSave(ctx)) reject(ctx, ErrPostUnauthorized)
+	            else deserialize(ctx, req) match {
+		                case Some(toSave) => {
+		                    save(toSave) match {
+		                        case Some(saved) => Created ~> (ctx,saved)
+		                        case _ => ErrPostCannotCreate
+		                    }
+		                }
+		                case _ => ErrPostCannotDeser
+	            	}
+	        }
+	    	
+	    	// GET w/o id is a query
+	    	//
+	        case req @ GET(_) => {
+	            if (!authorizeGetAll(ctx)) reject(ctx, ErrGetUnauthorized)
+	            object Count extends Params.Extract("count", Params.first ~> Params.nonempty)
+	            object Page extends Params.Extract("page", Params.first ~> Params.int)
+	            object Size extends Params.Extract("size", Params.first ~> Params.int)
+	            req match {
+	                case Params(Count(flag)) if (flag == "true" | flag == "TRUE") =>
+	                    Ok ~> (ctx -> count(ctx, QueryParams(None,None)))
+	                case Params(Page(p) & Size(s)) => {
+	                    val sz = MaxPageSize match {
+	                        case Some(max) => if (max>s) s else max
+	                        case None => s
+	                    }
+	                    Ok ~> (ctx -> query(ctx, QueryParams(Some(p),Some(sz))))
+	                }
+	                case Size(s) => {
+	                    val sz = MaxPageSize match {
+	                        case Some(max) => if (max>s) s else max
+	                        case None => s
+	                    }
+	                    Ok ~> (ctx -> query(ctx, QueryParams(None,Some(sz))))
+	                }
+	                case _ => {
+	                	MaxPageSize match {
+	                        case Some(max) => Ok ~> (ctx -> query(ctx, QueryParams(None,Some(max))))
+	                        case None => Ok ~> (ctx -> query(ctx,QueryParams(None,None)))
+	                    }
+	                }
+	            }
+	        } 
+
+	        // fall through
+	        //
+	        case _ => fail(ctx)
+	    }
+	}
     
     private def fail(ctx: Context): ErrorResponse = ctx.req match {
 
@@ -260,10 +254,6 @@ abstract class ResourcePlan[T,R](Version: Int, Group: String, ResourcePath: Stri
     	case req @ _ => ErrBadMethod(req.method)
     }
 }
-
-sealed abstract class ErrorBase
-case class ErrorResponse(status: Status, code: Int, message: String) extends ErrorBase
-case class ResourceError(val code: Int, val message: String)
 
 object ErrPostUnauthorized extends ErrorResponse(Unauthorized, 1000, "unauthorized")
 object ErrPostCannotCreate extends ErrorResponse(BadRequest, 1001, "unable to create resource")

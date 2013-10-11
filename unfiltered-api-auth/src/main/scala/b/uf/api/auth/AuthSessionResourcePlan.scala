@@ -17,13 +17,13 @@ class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "session
 	// we can get, create, or delete a session only if we've been authenticated
 	//
     def authorizeSave(ctx: Context): Boolean = permIfAuth(ctx auth)
-    def authorizeDelete(ctx: Context): Boolean = permIfAuth(ctx auth)
-    def authorizeGet(ctx: Context): Boolean = permIfAuth(ctx auth)
+    def authorizeDelete(ctx: Context, resourceId: String): Boolean = permIfAuth(ctx auth)
+    def authorizeGet(ctx: Context, resourceId: String): Boolean = permIfAuth(ctx auth)
     def authorizeGetAll(ctx: Context): Boolean = false
     
     // no updating, ever
 	//
-    def authorizeUpdate(ctx: Context): Boolean = false
+    def authorizeUpdate(ctx: Context, resourceId: String): Boolean = false
 
     // this is called when we're prepping for 'save' - if we're authenticated, create the session
     // here and when we get to 'save', we're just going to return this created session resource
@@ -37,8 +37,8 @@ class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "session
         }
     }
 
-    def query(ctx: Context, page: Option[Int], size: Option[Int]): List[S] = Nil
-    def count(ctx: Context): Int = 0
+    def query(ctx: Context, qp: QueryParams): List[S] = Nil
+    def count(ctx: Context, qp: QueryParams): Int = 0
     
     // find our user's session, ignore 'id', as it's "local"
     //
