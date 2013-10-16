@@ -6,8 +6,8 @@ package object slick {
         case class PagerParams(page: Option[Int], size: Option[Int])
     }
 
-    import b.slick.DB.db.driver.profile.simple.{ Session, Query, queryToAppliedQueryInvoker }
-    //    import simple.{ Session, Query, queryToAppliedQueryInvoker }
+    import DB.component.driver.profile.simple.{ Session, Query, queryToAppliedQueryInvoker }
+
     class QueryPager[QQ, R](q: Query[QQ, _ <: R]) {
         def paginate(pp: QueryPager.PagerParams)(implicit s: Session): List[R] = paginate(pp.page, pp.size)
         def paginate(page: Option[Int], size: Option[Int])(implicit s: Session) = {
@@ -20,7 +20,7 @@ package object slick {
 
     // import the slick driver's "query language" imports
     //
-    val simple = b.slick.DB.db.driver.profile.simple
+    val simple = DB.component.driver.profile.simple
 
     // simplify Session type
     type Database = scala.slick.jdbc.JdbcBackend.Database
@@ -41,7 +41,8 @@ package object slick {
     //            t => new DateTime(t getTime, UTC))
 
     import simple._
-    abstract class DBTable[T](tag: Tag, tableName: String) extends Table[T](tag: Tag, DB.db.entityName(tableName)) {}
+    abstract class DBTable[T](tag: Tag, tableName: String)
+    	extends Table[T](tag: Tag, DB.component.entityName(tableName)) {}
     
     // implicit converter that wraps a Query in a QueryPager
     // that can list its results using pagination params

@@ -13,16 +13,21 @@
 	<artifactId>specs2-slick</artifactId>
 
 	<dependencies>
-	  <dependency>
-	    <groupId>${project.groupId}</groupId>
-	    <artifactId>specs2-core</artifactId>
-	    <version>${project.version}</version>
-	  </dependency>
-	  <dependency>
-	    <groupId>${project.groupId}</groupId>
-	    <artifactId>slick</artifactId>
-	    <version>${project.version}</version>
-	  </dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>specs2-core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>slick</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>commons-dbcp</groupId>
+			<artifactId>commons-dbcp</artifactId>
+			<version>${commons-dbcp.version}</version>
+		</dependency>
 	</dependencies>
-	
+
 </project>
