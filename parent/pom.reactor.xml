@@ -17,12 +17,12 @@
 
   <modules>
     <module>parent</module>
-    <module>parent-testable</module>
     <module>common</module>
     <module>slick</module>
     <module>specs2-core</module>
     <module>specs2-api</module>
     <module>specs2-slick</module>
+    <module>specs2-wro</module>
     <module>unfiltered-core</module>
     <module>unfiltered-api-core</module>
     <module>unfiltered-api-auth</module>

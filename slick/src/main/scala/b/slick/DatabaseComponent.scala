@@ -1,9 +1,11 @@
 package b.slick
 
-import scala.slick.session.ResultSetConcurrency
-import scala.slick.session.ResultSetHoldability
-import scala.slick.session.ResultSetType
-import scala.slick.session.Database
+import scala.slick.jdbc.ResultSetConcurrency
+import scala.slick.jdbc.ResultSetHoldability
+import scala.slick.jdbc.ResultSetType
+//import scala.slick.jdbc.Database
+import scala.slick.driver.JdbcProfile
+import scala.slick.profile.BasicDriver
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.SQLException
@@ -12,7 +14,7 @@ import javax.validation.ConstraintViolationException
 trait Tx extends TxBase with DefaultSlickSessionComponent
 
 object DB {
-
+    
     def apply[D<:DatabaseComponent](dbComp: D) {
         DB.dbConfig = Some(dbComp)
         DB.db // init on 'apply' for fast-fail
@@ -45,6 +47,7 @@ object DB {
 }
 
 trait SlickSessionComponent {
+    import simple._
     def sessionProvider: SlickSessionProvider
     trait SlickSessionProvider {
         def createReadOnlySession(handle: Database): Session
@@ -53,6 +56,7 @@ trait SlickSessionComponent {
 }
 
 trait DefaultSlickSessionComponent extends SlickSessionComponent {
+	import simple._
     def sessionProvider = new SlickSessionProvider {
         def createReadOnlySession(handle: Database): Session = {
             handle.createSession().forParameters(rsConcurrency = ResultSetConcurrency.ReadOnly)
@@ -71,6 +75,7 @@ trait TxBase extends b.common.Logger { this: SlickSessionComponent =>
     import DBSessionImplicits._
     import scala.concurrent._
     import ExecutionContext.Implicits.global
+    import simple._
 
     def readOnlyAsync[T](f: ROSession => T): Future[T] = future { readOnly(f) }
     def readWriteAsync[T](f: RWSession => T): Future[T] = future { readWrite(f) }
@@ -123,13 +128,15 @@ trait TxBase extends b.common.Logger { this: SlickSessionComponent =>
 }
 
 object DBSessionImplicits {
+    import simple._
 
-    abstract class SessionWrapper(_session: => Session) extends Session {
-        lazy val session = _session
+    abstract class SessionWrapper(_session: => Session) extends JdbcSession {
+        lazy val session: JdbcSession = _session.asInstanceOf[JdbcSession]
 
         def conn: Connection = session.conn
         def metaData = session.metaData
         def capabilities = session.capabilities
+        override def database = session.database
         override def resultSetType = session.resultSetType
         override def resultSetConcurrency = session.resultSetConcurrency
         override def resultSetHoldability = session.resultSetHoldability
@@ -145,7 +152,7 @@ object DBSessionImplicits {
             rsHoldability: ResultSetHoldability = resultSetHoldability) = throw new UnsupportedOperationException
     }
 
-    abstract class RSession(roSession: => Session) extends SessionWrapper(roSession)
+    abstract class RSession(rSession: => Session) extends SessionWrapper(rSession)
     class ROSession(roSession: => Session) extends RSession(roSession)
     class RWSession(rwSession: Session) extends RSession(rwSession)
 
@@ -153,7 +160,8 @@ object DBSessionImplicits {
     implicit def rwToSession(rwSession: RWSession): Session = rwSession.session
 }
 
-import scala.slick.driver.ExtendedDriver
+//import scala.slick.driver.ExtendedDriver
+import scala.slick.driver.JdbcDriver
 import scala.slick.driver.H2Driver
 import scala.slick.driver.MySQLDriver
 import scala.slick.driver.PostgresDriver
@@ -164,19 +172,22 @@ case class DatabaseConnect(val user: String, val host: String, val path: String,
 sealed trait DatabaseComponent extends b.common.Logger {
 
     // the Slick driver (e.g. H2 or MySQL)
-    val driver: ExtendedDriver
+//    val driver: ExtendedDriver
+    val driver: JdbcDriver
 
     // connection info
     val dbc: DatabaseConnect
     val jdbcScheme: String
     def defaultPort: Int
 
-    lazy val handle: scala.slick.session.Database = {
+    lazy val handle: Database = {
 		val jdbcUrl = "jdbc:%s://%s:%d%s" format (jdbcScheme, dbc.host, dbc.port.getOrElse(defaultPort), dbc.path)
 		logger.info("Creating database handle from: url=%s, user=%s, pass=***" format(jdbcUrl, dbc.user))
         dbc.pass match {
-            case Some(p) => slick.session.Database.forURL(jdbcUrl, dbc.user, p)
-            case None => slick.session.Database.forURL(jdbcUrl, dbc.user)
+//            case Some(p) => slick.session.Database.forURL(jdbcUrl, dbc.user, p)
+//            case None => slick.session.Database.forURL(jdbcUrl, dbc.user)
+            case Some(p) => scala.slick.jdbc.JdbcBackend.Database.forURL(jdbcUrl, dbc.user, p)
+            case None => scala.slick.jdbc.JdbcBackend.Database.forURL(jdbcUrl, dbc.user)
         }
     }
     

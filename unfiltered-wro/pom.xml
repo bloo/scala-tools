@@ -5,9 +5,9 @@
 
 	<parent>
 		<groupId>bloo</groupId>
-		<artifactId>parent-testable</artifactId>
+		<artifactId>parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
-		<relativePath>../parent-testable/pom.xml</relativePath>
+		<relativePath>../parent/pom.xml</relativePath>
 	</parent>
 
 	<artifactId>unfiltered-wro</artifactId>

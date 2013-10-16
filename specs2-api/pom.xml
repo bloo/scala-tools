@@ -13,16 +13,21 @@
 	<artifactId>specs2-api</artifactId>
 
 	<dependencies>
-	        <dependency>
-		        <groupId>${project.groupId}</groupId>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
 			<artifactId>specs2-core</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-	        <dependency>
-		        <groupId>${project.groupId}</groupId>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
 			<artifactId>unfiltered-api-core</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>unfiltered-api-auth</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 	</dependencies>
-	
+
 </project>

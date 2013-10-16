@@ -1,7 +1,8 @@
-package b.uf.api.auth
+package b.specs2.uf.api.auth
 
 import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
+import b.uf.api.auth._
 
 case class Token(user: String, pass: String)
 case class Session(id: String, user: String)

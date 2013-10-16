@@ -1,5 +1,6 @@
 package b.uf.api.auth
 
+import b.uf.api.ResourcePlan
 import org.joda.time.DateTime
 import net.liftweb.json.DefaultFormats
 import net.liftweb.json.Extraction.decompose
@@ -7,8 +8,6 @@ import net.liftweb.json.pretty
 import net.liftweb.json.render
 import unfiltered.request.BasicAuth
 import unfiltered.request.HttpRequest
-import b.uf.api.ResourcePlan
-
 
 class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "sessions")
 	with BasicResourceAuthComponent[T,S] {

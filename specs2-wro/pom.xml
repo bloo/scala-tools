@@ -10,14 +10,19 @@
 		<relativePath>../parent/pom.xml</relativePath>
 	</parent>
 
-	<artifactId>unfiltered-api-auth</artifactId>
+	<artifactId>specs2-wro</artifactId>
 
 	<dependencies>
-		<dependency>
-			<groupId>${project.groupId}</groupId>
-			<artifactId>unfiltered-api-core</artifactId>
-			<version>${project.version}</version>
-		</dependency>
+	  <dependency>
+	    <groupId>${project.groupId}</groupId>
+	    <artifactId>specs2-core</artifactId>
+	    <version>${project.version}</version>
+	  </dependency>
+	  <dependency>
+	    <groupId>${project.groupId}</groupId>
+	    <artifactId>unfiltered-wro</artifactId>
+	    <version>${project.version}</version>
+	  </dependency>
 	</dependencies>
-
+	
 </project>

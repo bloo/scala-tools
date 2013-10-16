@@ -45,8 +45,7 @@ trait Scalate extends b.common.Logger {
 
     def respond[A](template: String, request: HttpRequest[A], attributes: (String, Any)*) = new ResponseWriter {
         def write(writer: OutputStreamWriter) {
-            val path = Path(request)
-            Scalate.cfg.render(path, template, writer)
+            Scalate.cfg.render(template, writer, attributes:_*)
         }
     }
 }
