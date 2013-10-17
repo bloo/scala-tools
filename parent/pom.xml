@@ -73,9 +73,10 @@
 		<commons-io.version>2.4</commons-io.version>
 
 		<!-- slick -->
-<!-- 		<slick.version>1.0.1</slick.version> -->
+		<!-- <slick.version>1.0.1</slick.version> -->
 		<slick.version>2.0.0-M2</slick.version>
 		<javax-validation.version>1.0.0.GA</javax-validation.version>
+		<commons-dbcp.version>1.4</commons-dbcp.version>
 
 		<!-- unfiltered-core -->
 		<unfiltered.version>0.7.0</unfiltered.version>
@@ -104,7 +105,6 @@
 		<mockito.version>1.9.5</mockito.version>
 
 		<!-- specs2-slick -->
-		<commons-dbcp.version>1.4</commons-dbcp.version>
 
 		<!-- specs2-api -->
 	</properties>
@@ -162,6 +162,11 @@
 				<groupId>javax.validation</groupId>
 				<artifactId>validation-api</artifactId>
 				<version>${javax-validation.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>commons-dbcp</groupId>
+				<artifactId>commons-dbcp</artifactId>
+				<version>${commons-dbcp.version}</version>
 			</dependency>
 
 			<dependency>

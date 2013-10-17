@@ -18,18 +18,18 @@ object DB extends Logger {
 
     private var comp: DatabaseComponent = null
     lazy val component = comp
-
-    import javax.sql.DataSource
-    import scala.slick.jdbc.JdbcBackend.Database
-    def apply(jdbcScheme: String, ds: DataSource) = {
-        //uri.getScheme
-        val db = Database.forDataSource(ds)
-        comp = jdbcScheme match {
-            case "postgres"|"postgresql" => PostgreSQL(db)
-            case "h2" => H2(db)
-            case "mysql" => MySQL(db)
-            case _ => throw new Error("Unable to create DatabaseComponent for %s" format jdbcScheme)
+    private var db: Database = null
+    lazy val handle = db
+    
+    def apply(scheme: String)(dcf: DatabaseComponent => javax.sql.DataSource) = {
+        comp = scheme match {
+            case "postgres" | "postgresql" => PostgreSQL
+            case "h2" => H2
+            case "mysql" => MySQL
+            case _ => throw new Error("Unable to create DatabaseConnect for %s" format scheme)
         }
+        val ds = dcf(comp)
+        db = scala.slick.jdbc.JdbcBackend.Database.forDataSource(ds)
     }
 }
 
@@ -66,7 +66,7 @@ trait TxBase extends Logger { this: SlickSessionComponent =>
     def readWriteAsync[T](f: RWSession => T): Future[T] = future { readWrite(f) }
     def readWriteAsync[T](attempts: Int)(f: RWSession => T): Future[T] = future { readWrite(attempts)(f) }
 
-    lazy val handle = DB.component.handle
+    lazy val handle = DB.handle
 
     def readOnly[T](f: ROSession => T): T = {
         var s: Option[Session] = None
@@ -147,41 +147,46 @@ object DBSessionImplicits {
     implicit def rwToSession(rwSession: RWSession): Session = rwSession.session
 }
 
-import scala.slick.driver.JdbcDriver
-import scala.slick.driver.H2Driver
-import scala.slick.driver.MySQLDriver
-import scala.slick.driver.PostgresDriver
 
+
+import scala.slick.driver.JdbcDriver
 sealed trait DatabaseComponent extends Logger {
 
     // the Slick driver (e.g. H2 or MySQL)
     val driver: JdbcDriver
+    val driverName: String
 
     // connection info
-    val handle: Database
-    val jdbcScheme: String
     def defaultPort: Int
+    val jdbcScheme: String
 
     // MySQL and H2 have different preferences on casing the table and column names.
     // H2 specifically prefers upper case
     def entityName(name: String): String = name
 }
 
-case class H2(val handle: Database) extends DatabaseComponent {
+import scala.slick.driver.H2Driver
+import scala.slick.driver.MySQLDriver
+import scala.slick.driver.PostgresDriver
+
+object H2 extends DatabaseComponent {
     val driver = H2Driver
     val jdbcScheme = "h2"
+    val driverName = "org.h2.Driver"
     def defaultPort = throw new Error("Please configure an explicit port for H2 database")
     override def entityName(name: String): String = name.toUpperCase()
 }
 
-case class MySQL(val handle: Database) extends DatabaseComponent {
+object MySQL extends DatabaseComponent {
     val driver = MySQLDriver
     val jdbcScheme = "mysql"
+    val driverName = "com.mysql.jdbc.Driver"
     def defaultPort = 3306
 }
 
-case class PostgreSQL(val handle: Database) extends DatabaseComponent {
+object PostgreSQL extends DatabaseComponent {
     val driver = PostgresDriver
     val jdbcScheme = "postgresql"
+    val driverName = "org.postgresql.Driver"
     def defaultPort = 5432
 }
