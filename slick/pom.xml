@@ -27,8 +27,8 @@
 			<artifactId>validation-api</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>commons-dbcp</groupId>
-			<artifactId>commons-dbcp</artifactId>
+			<groupId>c3p0</groupId>
+			<artifactId>c3p0</artifactId>
 		</dependency>
 	</dependencies>
 	

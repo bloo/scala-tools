@@ -15,7 +15,7 @@
 	<repositories>
 		<repository>
 			<id>internal-m2</id>
-			<name>Winespoke Internal M2</name>
+			<name>Bloo/ST Internal M2</name>
 			<url>http://dl.dropbox.com/u/8678549/mvn-repos</url>
 			<snapshots>
 				<enabled>true</enabled>
@@ -24,7 +24,7 @@
 		</repository>
 		<repository>
 			<id>internal-ivy</id>
-			<name>Winespoke Internal Ivy</name>
+			<name>Bloo/ST Internal Ivy</name>
 			<url>http://dl.dropbox.com/u/8678549/ivy-repos</url>
 			<snapshots>
 				<enabled>true</enabled>
@@ -44,21 +44,21 @@
 		-DgroupId=com.newrelic -DartifactId=newrelic -Dversion=2.9.0 -Dpackaging=jar -->
 
 	<properties>
-	        <!-- project and plugin deps for ALL -->
+		<!-- project and plugin deps for ALL -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.version>3.0.5</maven.version>
-		<scala-maven-plugin.version>3.1.5</scala-maven-plugin.version>
-		<maven-compiler-plugin.version>2.5.1</maven-compiler-plugin.version>
-		<maven-surefire-plugin.version>2.12.4</maven-surefire-plugin.version>
+		<maven.version>3.1.1</maven.version>
+		<scala-maven-plugin.version>3.1.6</scala-maven-plugin.version>
+		<maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
+		<maven-surefire-plugin.version>2.16</maven-surefire-plugin.version>
 		<lifecycle-mapping-plugin.version>1.0.0</lifecycle-mapping-plugin.version>
-		<maven-specs2-plugin.version>0.4.1</maven-specs2-plugin.version>
+		<maven-specs2-plugin.version>0.4.2</maven-specs2-plugin.version>
 		<maven-source-plugin.version>2.1.2</maven-source-plugin.version>
 
 		<!-- build deps for ALL -->
 		<jdk.version>1.7</jdk.version> <!-- rm'd maven-compiler plugin.. -->
 		<scala.version.major>2.10</scala.version.major>
 		<sv>${scala.version.major}</sv>
-		<scala.version>${scala.version.major}.2</scala.version>
+		<scala.version>${scala.version.major}.3</scala.version>
 
 		<!-- common - logging -->
 		<log4j.version>1.2.16</log4j.version>
@@ -76,7 +76,7 @@
 		<!-- <slick.version>1.0.1</slick.version> -->
 		<slick.version>2.0.0-M2</slick.version>
 		<javax-validation.version>1.0.0.GA</javax-validation.version>
-		<commons-dbcp.version>1.4</commons-dbcp.version>
+		<c3p0.version>0.9.1.2</c3p0.version>
 
 		<!-- unfiltered-core -->
 		<unfiltered.version>0.7.0</unfiltered.version>
@@ -101,7 +101,8 @@
 
 		<!-- specs2-core -->
 		<junit.version>4.8.2</junit.version>
-		<specs2.version>2.1.1</specs2.version>
+		<specs2.version>2.2.2</specs2.version>
+		<scalaz.version>7.0.3</scalaz.version> <!-- 7.0.2 bundled w/ specs2, we need 7.0.3 -->
 		<mockito.version>1.9.5</mockito.version>
 
 		<!-- specs2-slick -->
@@ -164,9 +165,9 @@
 				<version>${javax-validation.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>commons-dbcp</groupId>
-				<artifactId>commons-dbcp</artifactId>
-				<version>${commons-dbcp.version}</version>
+				<groupId>c3p0</groupId>
+				<artifactId>c3p0</artifactId>
+				<version>${c3p0.version}</version>
 			</dependency>
 
 			<dependency>
@@ -251,10 +252,10 @@
 				<artifactId>wro4j-extensions</artifactId>
 				<version>${wro4j.version}</version>
 				<exclusions>
-				  <exclusion>
-				    <groupId>*</groupId>
-				    <artifactId>*</artifactId>
-				  </exclusion>
+					<exclusion>
+						<groupId>*</groupId>
+						<artifactId>*</artifactId>
+					</exclusion>
 				</exclusions>
 			</dependency>
 
@@ -267,6 +268,16 @@
 				<groupId>org.specs2</groupId>
 				<artifactId>specs2_${sv}</artifactId>
 				<version>${specs2.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.scalaz</groupId>
+				<artifactId>scalaz-core_${sv}</artifactId>
+				<version>${scalaz.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.scalaz</groupId>
+				<artifactId>scalaz-effect_${sv}</artifactId>
+				<version>${scalaz.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>org.mockito</groupId>
@@ -293,20 +304,20 @@
 
 	<build>
 		<plugins>
-		        <plugin>
-			        <artifactId>maven-compiler-plugin</artifactId>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
 				<version>${maven-compiler-plugin.version}</version>
 				<configuration>
-				        <source>${jdk.version}</source>
-				        <target>${jdk.version}</target>
-				        <encoding>${project.build.sourceEncoding}</encoding>
+					<source>${jdk.version}</source>
+					<target>${jdk.version}</target>
+					<encoding>${project.build.sourceEncoding}</encoding>
 				</configuration>
 			</plugin>
-		        <plugin>
-			        <artifactId>maven-surefire-plugin</artifactId>
+			<plugin>
+				<artifactId>maven-surefire-plugin</artifactId>
 				<version>${maven-surefire-plugin.version}</version>
 				<configuration>
-				        <skip>true</skip>
+					<skip>true</skip>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -354,7 +365,7 @@
 					<executions>
 						<execution>
 							<id>specs2-run</id>
-<!-- 							<phase>verify</phase> -->
+							<!-- <phase>verify</phase> -->
 							<phase>test</phase>
 							<goals>
 								<goal>run-specs</goal>

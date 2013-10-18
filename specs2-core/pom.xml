@@ -27,6 +27,14 @@
 			<artifactId>specs2_${sv}</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.scalaz</groupId>
+			<artifactId>scalaz-core_${sv}</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.scalaz</groupId>
+			<artifactId>scalaz-effect_${sv}</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.mockito</groupId>
 			<artifactId>mockito-core</artifactId>
 		</dependency>

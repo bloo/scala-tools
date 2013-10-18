@@ -9,10 +9,7 @@ abstract class DBSpecBase(jdbcScheme: String, dbName: String) extends mutable.Sp
     // init
     DB(jdbcScheme) { dbc: DatabaseComponent =>
 	    val un = System.getProperty("user.name")
-	    val ds = new org.apache.commons.dbcp.BasicDataSource
-	    ds.setDriverClassName(dbc.driverName)
-	    ds.setUrl("jdbc:%s://localhost/%s" format (dbc.jdbcScheme, dbName))
-	    ds.setUsername(un)
-	    ds
+	    val jdbcUrl = "jdbc:%s://localhost/%s" format (dbc.jdbcScheme, dbName)
+	    PooledDataSource(dbc.driverName, jdbcUrl, un, 1, 5)
     }
 }
