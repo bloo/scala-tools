@@ -22,7 +22,7 @@ object URIDataSource extends b.common.Logger {
             val port = if (uri.getPort <= -1) dbc.defaultPort else uri.getPort
             val jdbcUrl = "jdbc:%s://%s:%d%s" format (dbc.jdbcScheme, host, port, uri.getPath)
             
-            PooledDataSource(dbc.driverName, jdbcUrl, user, min, max)
+            PooledDataSource(dbc.driverName, jdbcUrl, user, pass, min, max)
         }
     }
 }
