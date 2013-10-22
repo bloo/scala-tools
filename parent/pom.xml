@@ -89,7 +89,7 @@
 		<!-- unfiltered-api-auth -->
 
 		<!-- unfiltered-wro -->
-		<wro4j.version>1.7.0</wro4j.version>
+		<wro4j.version>1.7.1</wro4j.version>
 		<sass.version>3.2.1</sass.version>
 		<jruby.version>1.7.4</jruby.version>
 		<webjars-locator.version>0.5</webjars-locator.version>

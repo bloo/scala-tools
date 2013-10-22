@@ -95,6 +95,7 @@ class WroPlan(file: String) extends b.common.Logger {
 	        for (p <- post) addPostProcessor(p)
 	    }
 	
+        //ro.isdc.wro.maven.plugin.manager.factory.ConfigurableWroManagerFactory
 	    val factory = new ConfigurableWroManagerFactory {
 	
 	        setProcessorsFactory(spf)
