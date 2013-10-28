@@ -23,7 +23,7 @@ trait Scalate extends b.common.Logger {
     private var pathPrefix: String = ""
 
     def t[A](path: String, req: HttpRequest[A]): ResponseWriter =
-        t(path, path.replaceAll("/", " ").capitalize, req)
+        t(path, path.replaceAll("^/", "").replaceAll("/", " ").capitalize, req)
 
     def t[A](path: String, title: String, req: HttpRequest[A]): ResponseWriter =
         r(path, req, "title" -> title)
