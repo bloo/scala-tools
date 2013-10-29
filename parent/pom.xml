@@ -91,7 +91,7 @@
 		<!-- unfiltered-wro -->
 		<wro4j.version>1.7.1</wro4j.version>
 		<sass.version>3.2.1</sass.version>
-		<jruby.version>1.7.4</jruby.version>
+		<jruby.version>1.7.5</jruby.version>
 		<webjars-locator.version>0.5</webjars-locator.version>
 		<webjars-coffeescript.version>1.6.3</webjars-coffeescript.version>
 		<bourbon-gem.version>2.1.0</bourbon-gem.version>
@@ -223,6 +223,7 @@
 				<version>${jruby.version}</version>
 			</dependency>
 			<dependency>
+				<!-- override bourbon-gem-jar's sass-gems constraint of [3.1.16,3.2) -->
 				<groupId>me.n4u.sass</groupId>
 				<artifactId>sass-gems</artifactId>
 				<version>${sass.version}</version>
@@ -241,6 +242,13 @@
 				<groupId>nz.co.edmi</groupId>
 				<artifactId>bourbon-gem-jar</artifactId>
 				<version>${bourbon-gem.version}</version>
+				<exclusions>
+					<exclusion>
+						<!-- exclude shitty constraint of [3.1.16,3.2) -->
+						<groupId>me.n4u.sass</groupId>
+						<artifactId>sass-gems</artifactId>
+					</exclusion>
+				</exclusions>
 			</dependency>
 			<dependency>
 				<groupId>ro.isdc.wro4j</groupId>
@@ -253,8 +261,60 @@
 				<version>${wro4j.version}</version>
 				<exclusions>
 					<exclusion>
-						<groupId>*</groupId>
-						<artifactId>*</artifactId>
+						<groupId>ro.isdc.wro4j</groupId>
+						<artifactId>rhino</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.springframework</groupId>
+						<artifactId>spring-web</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>com.google.code.gson</groupId>
+						<artifactId>gson</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>com.google.javascript</groupId>
+						<artifactId>closure-compiler</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>com.github.lltyk</groupId>
+						<artifactId>dojo-shrinksafe</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.jruby</groupId>
+						<artifactId>jruby-core</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>com.github.sommeri</groupId>
+						<artifactId>less4j</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.codehaus.gmaven.runtime</groupId>
+						<artifactId>gmaven-runtime-1.7</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.webjars</groupId>
+						<artifactId>jshint</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.webjars</groupId>
+						<artifactId>less</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.webjars</groupId>
+						<artifactId>emberjs</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.webjars</groupId>
+						<artifactId>handlebars</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.webjars</groupId>
+						<artifactId>jslint</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.webjars</groupId>
+						<artifactId>json2</artifactId>
 					</exclusion>
 				</exclusions>
 			</dependency>
