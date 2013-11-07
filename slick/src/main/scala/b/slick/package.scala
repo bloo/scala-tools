@@ -26,21 +26,21 @@ package object slick {
     type Database = scala.slick.jdbc.JdbcBackend.Database
     type JdbcSession = scala.slick.jdbc.JdbcBackend.Session
     type Session = simple.Session
-    
-    //    import java.sql.Timestamp
-    //    import org.joda.time.DateTime
-    //    import org.joda.time.DateTimeZone.UTC
-    //    import scala.slick.lifted.MappedTypeMapper.base
-    //    import scala.slick.lifted.TypeMapper
-    //
-    //    // sql.Timestamp <-> joda.DateTime type mapper
-    //    //
-    //    implicit val sql_2_joda_slickTypeMapper: TypeMapper[DateTime] =
-    //        base[DateTime, Timestamp](
-    //            d => new Timestamp(d getMillis),
-    //            t => new DateTime(t getTime, UTC))
 
     import simple._
+    import java.sql.Timestamp
+    import org.joda.time.DateTime
+    import org.joda.time.DateTimeZone.UTC
+    import scala.slick.ast.BaseTypedType
+
+    // sql.Timestamp <-> joda.DateTime type mapper
+    //
+    implicit val sql_2_joda_slickTypeMapper: BaseTypedType[DateTime] =
+        MappedColumnType.base[DateTime, Timestamp](
+            d => new Timestamp(d getMillis),
+            t => new DateTime(t getTime, UTC)
+        	)
+        	
     abstract class DBTable[T](tag: Tag, tableName: String)
     	extends Table[T](tag: Tag, DB.component.entityName(tableName)) {}
     
