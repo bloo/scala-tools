@@ -6,42 +6,46 @@ import net.liftweb.json.DefaultFormats
 import net.liftweb.json.Extraction.decompose
 import net.liftweb.json.pretty
 import net.liftweb.json.render
-import unfiltered.request.BasicAuth
+import unfiltered.request.{ BasicAuth, Params }
 import unfiltered.request.HttpRequest
 
-class AuthSessionResourcePlan[T,S] extends ResourcePlan[T,S](1, "auth", "sessions")
-	with BasicResourceAuthComponent[T,S] {
-    this: TokenComponent[T] with SessionComponent[T,S] =>
+class AuthSessionResourcePlan[T, S] extends ResourcePlan[T, S](1, "auth", "sessions")
+    with BasicResourceAuthComponent[T, S] {
+    this: TokenComponent[T] with SessionComponent[T, S] =>
 
-	import b.uf.api.Context
-
-    def deserialize(ctx: Context[T], data: String): Option[S] = {
-    	case class LoginRequest(val remember: Boolean)
-        val lr = fromJson[LoginRequest](data)
-        ctx auth match {
-	        case Some(acct) => Some(sessionService.create(acct, lr.remember))
-	        case _ => None
-        }
-    }
-    
     // find our user's session, ignore 'id', as it's "local"
     //
     def resolve(id: String): Option[S] =
         if ("local" == id) sessionService.local else sessionService get id
 
-    create {
-    	// session already 'saved' via deserialization(req)
-    	case(_) => { sess => Some(sess) }
-    }
+    object Remember extends b.uf.params.Flag("remember")
     
+    rcreate {
+        case (ctx) => { _ =>
+            ctx auth match {
+                // if request was auth'ed, we'll create a
+                // session from the auth'd token
+                //
+                case Some(token) => {
+                    val rem = ctx req match {
+                    	case Params(Remember(flag)) => flag
+                    	case _ => false
+                    }
+                    Some(sessionService.create(token, rem))
+                }
+                case _ => None
+            }
+        }
+    }
+
     get {
         // allow get, simply call resolve
-        case (ctx) if ctx hasAuth => { id => resolve(id) }
+        case (ctx) if ctx hasAuth => resolve _
     }
-    
+
     delete {
-    	// delete will unauthenticate, that is remove, the session
-        case (ctx) if ctx hasAuth => { sess => sessionService.remove(sess) }
+        // delete will unauthenticate, that is remove, the session
+        case (ctx) if ctx hasAuth => sessionService.remove(_)
     }
 }
 

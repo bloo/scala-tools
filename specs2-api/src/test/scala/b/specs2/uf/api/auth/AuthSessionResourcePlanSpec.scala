@@ -24,24 +24,24 @@ class AuthSessionResourcePlanSpec
         mockTokenLookup(MockUser.user, MockUser.pass, MockUser)
     }
 
-    val LoginJsonContent = """{"remember":false}"""
-
+    val LoginJsonContent = ("remember" -> "true")
+    
     "AuthSessionResourcePlan" should {
 
         "authorize valid login request" in {
-            val sess = post(LoginJsonContent)
+            val sess = post("", LoginJsonContent)
             sess.user must be_==(MockUser.user)
         }
 
         "authorize and retrieve authorized session" in {
-            val sess = post(LoginJsonContent)
+            val sess = post("", LoginJsonContent)
             val sess2 = get(sess.id)
             sess.id must be_==(sess2.id)
             sess.user must be_==(sess2.user)
         }
 
         "authorize and unauthorize session" in {
-            val sess = post(LoginJsonContent)
+            val sess = post("", LoginJsonContent)
             val sess2 = get(sess.id)
             sess.id must be_==(sess2.id)
             delete(sess.id)

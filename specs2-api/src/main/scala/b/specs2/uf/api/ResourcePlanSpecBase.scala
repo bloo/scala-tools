@@ -35,14 +35,17 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
     // from: unfiltered.specs2.jetty.Served
     def setup = _.plan(resourcePlan)
 
-    def newReq(id: String, requester: Option[Requester]): dispatch.classic.Request = newReq(Some(id), requester)
-    def newReq(requester: Option[Requester]): dispatch.classic.Request = newReq(None, requester)
-    def newReq(id: Option[String], requester: Option[Requester]): dispatch.classic.Request = {
+    def newReq(id: String, requester: Option[Requester], params: Seq[(String,String)]): Request =
+        newReq(Some(id), requester, params)
+    def newReq(requester: Option[Requester], params: Seq[(String,String)]): Request =
+        newReq(None, requester, params)
+    def newReq(id: Option[String], requester: Option[Requester], params: Seq[(String,String)]): Request = {
         val path = id match {
             case Some(i) => pathPrefix + "/" + i
             case _ => pathPrefix
         }
-        val req = host / path <:< Map("accept" -> "application/json", "content-type" -> "application/json")
+        var req = host / path <:< Map("accept" -> "application/json", "content-type" -> "application/json")
+        params foreach { p => req <<? Map(p) }
         requester match {
             case Some((user, pass)) => req as_! (user, pass)
             case _ => req
@@ -80,34 +83,42 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
 
     // http://blog.xebia.com/2011/11/26/easy-breezy-restful-service-testing-with-dispatch-in-scala/
 
-    def xpost(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester] = None)
-    	= xhttp(_reqToStatusAndResult(newReq(requester) << (json)))
-   	def post(json: String)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
-        val resultJson = http(newReq(requester) << (json) as_str)
+	def _params(req: Request, params: Seq[(String,String)]) = {
+	    var r = req
+	    params foreach { p => r = r <<? Map(p) }
+	    r
+	}
+	    
+    def xpost(json: String, params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester] = None) =
+    	xhttp(_reqToStatusAndResult(newReq(requester, params) << (json)))
+   	def post(json: String, params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
+        val resultJson = http(newReq(requester, params) << (json) as_str)
         fromJson[R](resultJson)
     }
 
-    def xget(id: String)(implicit mf: Manifest[R], requester: Option[Requester]): (Int,Option[R])
-    	= xhttp(_reqToStatusAndResult(newReq(id, requester)))
-    def get(id: String)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
-        val resultJson = http(newReq(id, requester) as_str)
+    def xget(id: String, params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester]): (Int,Option[R]) =
+    	xhttp(_reqToStatusAndResult(newReq(id, requester, params)))
+    def get(id: String, params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
+        val resultJson = http(newReq(id, requester, params) as_str)
         fromJson[R](resultJson)
     }
 
-    def xget()(implicit mf: Manifest[R], requester: Option[Requester]): (Int,Option[List[R]])
-    	= xhttp(_reqToStatusAndResults(newReq(requester)))
-    def get()(implicit mf: Manifest[R], requester: Option[Requester]): List[R] = {
-        val resultJson = http(newReq(requester) as_str)
+    def xget(params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester]): (Int,Option[List[R]]) =
+        xhttp(_reqToStatusAndResults(newReq(requester, params)))
+    def get(params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester]): List[R] = {
+        val resultJson = http(newReq(requester, params) as_str)
         fromJson[List[R]](resultJson)
     }
 
-    def xdelete(id: String)(implicit requester: Option[Requester]) = xhttp(_reqToStatus(newReq(id, requester).DELETE))
-    def delete(id: String)(implicit requester: Option[Requester]) = http(newReq(id, requester).DELETE as_str)
+    def xdelete(id: String, params:(String,String)*)(implicit requester: Option[Requester]) =
+        xhttp(_reqToStatus(newReq(id, requester, params).DELETE))
+    def delete(id: String, params:(String,String)*)(implicit requester: Option[Requester]) =
+        http(newReq(id, requester, params).DELETE as_str)
 
-    def xput(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester])
-    	= xhttp(_reqToStatusAndResult(newReq(id, requester) <<< (json)))
-    def put(json: String, id: String)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
-        val resultJson = http(newReq(id, requester) <<< (json) as_str)
+    def xput(json: String, id: String, params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester])
+    	= xhttp(_reqToStatusAndResult(newReq(id, requester, params) <<< (json)))
+    def put(json: String, id: String, params:(String,String)*)(implicit mf: Manifest[R], requester: Option[Requester]): R = {
+        val resultJson = http(newReq(id, requester, params) <<< (json) as_str)
         fromJson[R](resultJson)
     }    
 }

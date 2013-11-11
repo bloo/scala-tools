@@ -66,33 +66,37 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
     //
     def resolve(resourceId: String): Option[R]
 
-    type Creator = PartialFunction[Context[T], R=>Option[R]]
+    type Creator = PartialFunction[Context[T], R => Option[R]]
     private var _creator: Creator = Map.empty
     def create(c: Creator) = _creator = c
 
-    type Getter = PartialFunction[Context[T], String=>Option[R]]
+    type RawCreator = PartialFunction[Context[T], String => Option[R]]
+    private var _rawCreator: RawCreator = Map.empty
+    def rcreate(c: RawCreator) = _rawCreator = c
+
+    type Getter = PartialFunction[Context[T], String => Option[R]]
     private var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
 
-    type Querier = PartialFunction[Context[T], QueryParams=>List[R]]
+    type Querier = PartialFunction[Context[T], QueryParams => List[R]]
     private var _querier: Querier = Map.empty
     def query(q: Querier) = _querier = q
 
-    type Counter = PartialFunction[Context[T], ()=>Int]
+    type Counter = PartialFunction[Context[T], () => Int]
     private var _counter: Counter = Map.empty
     def count(c: Counter) = _counter = c
 
-    type Updater = PartialFunction[Context[T], (R,R)=>Option[R]]
+    type Updater = PartialFunction[Context[T], (R, R) => Option[R]]
     private var _updater: Updater = Map.empty
     def update(u: Updater) = _updater = u
 
-    type Deleter = PartialFunction[Context[T], R=>Boolean]
+    type Deleter = PartialFunction[Context[T], R => Boolean]
     private var _deleter: Deleter = Map.empty
     def delete(d: Deleter) = _deleter = d
 
     // resource converters
     //
-    def deserialize(ctx: Context[T], data: String): Option[R]
+    def deserialize(ctx: Context[T], data: String): R = fromJson(data)
     def serialize(ctx: Context[T], resource: R): String = toJson(resource)
     def serialize(ctx: Context[T], resources: List[R]): String = toJson(resources)
 
@@ -142,16 +146,9 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
                     case None => reject(ctx, ErrPutUnauthorized)
                     case Some(u) => resolve(rid) match {
                         case None => ErrPutCannotResolveId
-                        case Some(resolved) => {
-                            deserialize(ctx, req) match {
-                                case None => ErrPutCannotDeser
-                                case Some(toUpdate) => {
-                                    u(resolved, toUpdate) match {
-                                        case Some(updated) => Ok ~> (ctx, updated)
-                                        case _ => ErrPutCannotUpdate
-                                    }
-                                }
-                            }
+                        case Some(resolved) => u(resolved, deserialize(ctx, req)) match {
+                            case Some(updated) => Ok ~> (ctx, updated)
+                            case _ => ErrPutCannotUpdate
                         }
                     }
                 }
@@ -194,14 +191,19 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
             // POST request must contain JSON
             //
             case req @ POST(Path(_) & RequestContentType("application/json")) => {
-                _creator lift ctx match {
-                    case None => reject(ctx, ErrPostUnauthorized)
-                    case Some(c) => deserialize(ctx, req) match {
-                        case None => ErrPostCannotDeser
-                        case Some(toCreate) => c(toCreate) match {
-                            case None => ErrPostCannotCreate
-                            case Some(created) => Created ~> (ctx, created)
+                _rawCreator lift ctx match {
+                    case None => {
+                        _creator lift ctx match {
+                            case None => reject(ctx, ErrPostUnauthorized)
+                            case Some(c) => c(deserialize(ctx, req)) match {
+                                case None => ErrPostCannotCreate
+                                case Some(created) => Created ~> (ctx, created)
+                            }
                         }
+                    }
+                    case Some(raw) => raw(req) match {
+                        case None => ErrPostCannotDeser
+                        case Some(created) => Created ~> (ctx, created)
                     }
                 }
             }
@@ -209,15 +211,12 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
             // GET w/o id is a query
             //
             case req @ GET(_) => {
-                
+
                 /*
                  * query 'count' flag extractor
                  */
-                object Count extends Params.Extract("count", Params.first ~> {
-                    case Some(flag) => if (flag == "true" || flag == "TRUE" || flag == "1") Some(true) else Some(false)
-                    case _ => None
-                })
-                
+                object Count extends b.uf.params.Flag("count")
+
                 req match {
 
                     // count flag is true - we only want the
@@ -227,7 +226,7 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
                         case None => reject(ctx, ErrCountUnauthorized)
                         case Some(c) => Ok ~> (ctx -> c())
                     }
-                    
+
                     case _ => _querier lift ctx match {
                         case None => reject(ctx, ErrGetUnauthorized)
                         case Some(q) => {
@@ -304,7 +303,6 @@ object ErrPostNotJson extends ErrorResponse(UnsupportedMediaType, 1003, "content
 object ErrPutUnauthorized extends ErrorResponse(Unauthorized, 2000, "unauthorized")
 object ErrPutCannotResolveId extends ErrorResponse(NotFound, 2001, "unknown id")
 object ErrPutCannotUpdate extends ErrorResponse(BadRequest, 2002, "unable to update resource")
-object ErrPutCannotDeser extends ErrorResponse(BadRequest, 2003, "unable to deserialize resource from content")
 object ErrPutMissingId extends ErrorResponse(NotFound, 2004, "resource id required in path")
 object ErrPutNotJson extends ErrorResponse(UnsupportedMediaType, 2005, "content-type must be application/json")
 

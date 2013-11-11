@@ -2,22 +2,6 @@ package b
 
 package object slick {
 
-    object QueryPager {
-        case class PagerParams(page: Option[Int], size: Option[Int])
-    }
-
-    import DB.component.driver.profile.simple.{ Session, Query, queryToAppliedQueryInvoker }
-
-    class QueryPager[QQ, R](q: Query[QQ, _ <: R]) {
-        def paginate(pp: QueryPager.PagerParams)(implicit s: Session): List[R] = paginate(pp.page, pp.size)
-        def paginate(page: Option[Int], size: Option[Int])(implicit s: Session) = {
-            (size match {
-                case Some(sz) => q.drop(sz * (page.getOrElse(1) - 1)).take(sz)
-                case None => q
-            }).list
-        }
-    }
-
     // import the slick driver's "query language" imports
     //
     val simple = DB.component.driver.profile.simple
@@ -38,14 +22,40 @@ package object slick {
     implicit val sql_2_joda_slickTypeMapper: BaseTypedType[DateTime] =
         MappedColumnType.base[DateTime, Timestamp](
             d => new Timestamp(d getMillis),
-            t => new DateTime(t getTime, UTC)
-        	)
-        	
+            t => new DateTime(t getTime, UTC))
+
     abstract class DBTable[T](tag: Tag, tableName: String)
-    	extends Table[T](tag: Tag, DB.component.entityName(tableName)) {}
-    
+        extends Table[T](tag: Tag, DB.component.entityName(tableName)) {}
+
     // implicit converter that wraps a Query in a QueryPager
     // that can list its results using pagination params
     //
     implicit def query_2_queryPager[QQ, R](q: Query[QQ, _ <: R]) = new QueryPager(q)
+
+    object QueryPager {
+        case class PagerParams(page: Option[Int], size: Option[Int])
+    }
+
+    import simple.{ Query, queryToAppliedQueryInvoker }
+    class QueryPager[QQ, R](q: Query[QQ, _ <: R]) {
+        def paginate(pp: QueryPager.PagerParams)(implicit s: Session): List[R] = paginate(pp.page, pp.size)
+        def paginate(page: Option[Int], size: Option[Int])(implicit s: Session) = {
+            (size match {
+                case Some(sz) => q.drop(sz * (page.getOrElse(1) - 1)).take(sz)
+                case None => q
+            }).list
+        }
+    }
+
+//    import DB.component.driver.profile.simple.slickDriver.AppliedQuery
+//    class AppliedQueryPager[QQ, R](q: AppliedQuery[QQ]) {
+//        def paginate(pp: QueryPager.PagerParams)(implicit s: Session): List[R] = paginate(pp.page, pp.size)
+//        def paginate(page: Option[Int], size: Option[Int])(implicit s: Session) = {
+//            (size match {
+//                // https://github.com/slick/slick/issues/102
+//                case Some(sz) => q.drop(sz * (page.getOrElse(1) - 1)).take(sz)
+//                case None => q
+//            }).list
+//        }
+//    }
 }

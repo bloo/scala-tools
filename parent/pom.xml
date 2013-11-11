@@ -73,8 +73,7 @@
 		<commons-io.version>2.4</commons-io.version>
 
 		<!-- slick -->
-		<!-- <slick.version>1.0.1</slick.version> -->
-		<slick.version>2.0.0-M2</slick.version>
+		<slick.version>2.0.0-M3</slick.version>
 		<javax-validation.version>1.0.0.GA</javax-validation.version>
 		<c3p0.version>0.9.1.2</c3p0.version>
 
