@@ -35,7 +35,8 @@ trait SessionComponent[T,S] {
 trait BasicResourceAuthComponent[T,S] extends b.uf.api.ResourceAuthComponent[T] with b.common.Logger {
 	this: TokenComponent[T] with SessionComponent[T,S] =>
 
-	def authService: AuthService[T] = new BasicAuthService
+	private lazy val _as = new BasicAuthService
+	def authService: AuthService[T] = _as
 
 	class BasicAuthService extends AuthService[T] { 
 	    //def realm: String

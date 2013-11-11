@@ -72,6 +72,9 @@
 		<!-- common - utils -->
 		<commons-io.version>2.4</commons-io.version>
 
+		<!-- common - files -->
+		<jets3t.version>0.9.0</jets3t.version>
+		
 		<!-- slick -->
 		<slick.version>2.0.0-M3</slick.version>
 		<javax-validation.version>1.1.0.Final</javax-validation.version>
@@ -151,6 +154,12 @@
 				<groupId>commons-io</groupId>
 				<artifactId>commons-io</artifactId>
 				<version>${commons-io.version}</version>
+			</dependency>
+
+			<dependency>
+				<groupId>net.java.dev.jets3t</groupId>
+				<artifactId>jets3t</artifactId>
+				<version>${jets3t.version}</version>
 			</dependency>
 
 			<dependency>
