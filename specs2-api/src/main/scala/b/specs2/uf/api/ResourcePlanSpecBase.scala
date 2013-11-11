@@ -24,7 +24,6 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
     // get our path prefix from the ResourcePlan instance
     //
     def pathPrefix: String = {
-//        val cfg = pathConfig
         val cfg = resourcePlan.PathConfig
         "api/v%d/%s/%s" format (cfg._1, cfg._2, cfg._3)
     }
@@ -76,9 +75,8 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
         }
     }
 
-    private def _reqToStatus(req: dispatch.classic.Request): Handler[Int] = {
+    private def _reqToStatus(req: dispatch.classic.Request): Handler[Int] =
 	    req >:> Predef.identity apply { case (status,_,_,_) => status }
-	}
 
     // http://blog.xebia.com/2011/11/26/easy-breezy-restful-service-testing-with-dispatch-in-scala/
 

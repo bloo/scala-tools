@@ -17,16 +17,14 @@ import unfiltered.response.Unauthorized
 import b.common.Logger
 import b.uf.errors._
 
+case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String, String]) {
+    def hasAuth = !auth.isEmpty
+}
+case class QueryParams(page: Option[Int] = None, size: Option[Int])
+
 object ResourcePlan {
 
     var prettyJson = false
-
-    // helper for subclasses - if authenticated, return true
-    //
-    def permIfAuth[A](auth: Option[A]): Boolean = auth match {
-        case Some(_) => true
-        case _ => false
-    }
 
     // helper json serializer
     //
@@ -53,51 +51,59 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
 
     lazy val PathConfig = (Version, Group, ResourcePath)
     lazy val PathPrefix = "/api/%s/%s/%s" format ("v" + Version, Group, ResourcePath)
+    private val ResourceIdParam = "resource_id"
 
-    def permIfAuth(auth: Option[T]): Boolean = ResourcePlan permIfAuth auth
     def toJson(obj: Any): String = ResourcePlan toJson obj
     def fromJson[O](json: String)(implicit mf: Manifest[O]): O = ResourcePlan fromJson json
 
-    private def reject(ctx: Context, resp: ErrorResponse): ResponseFunction[Any] = ctx.auth match {
+    private def reject(ctx: Context[T], resp: ErrorResponse): ResponseFunction[Any] = ctx.auth match {
         //        case Some(_) => Forbidden ~> resp // authenticated but unauthorized
         //        case _ => WWWAuthenticate(Realm) ~> resp // might need authentication
         case _ => Forbidden ~> resp // don't use wwwauthenticate for httpbasic, to avoid popup
     }
 
-    // authorization testers
-    //	
-    def authorizeSave(ctx: Context): Boolean
-    def authorizeUpdate(ctx: Context, resourceId: String): Boolean
-    def authorizeGetAll(ctx: Context): Boolean
-    def authorizeGet(ctx: Context, resourceId: String): Boolean
-    def authorizeDelete(ctx: Context, resourceId: String): Boolean
-
-    // resource handlers
+    // subclass needs to implement resource resolver
     //
-    def query(ctx: Context, qp: QueryParams): List[R]
-    def count(ctx: Context, qp: QueryParams): Int
-    def find(resourceId: String): Option[R]
-    def save(resource: R): Option[R]
-    def update(original: R, resource: R): Option[R]
-    def delete(resource: R): Boolean
+    def resolve(resourceId: String): Option[R]
+
+    type Creator = PartialFunction[Context[T], R=>Option[R]]
+    private var _creator: Creator = Map.empty
+    def create(c: Creator) = _creator = c
+
+    type Getter = PartialFunction[Context[T], String=>Option[R]]
+    private var _getter: Getter = Map.empty
+    def get(g: Getter) = _getter = g
+
+    type Querier = PartialFunction[Context[T], QueryParams=>List[R]]
+    private var _querier: Querier = Map.empty
+    def query(q: Querier) = _querier = q
+
+    type Counter = PartialFunction[Context[T], ()=>Int]
+    private var _counter: Counter = Map.empty
+    def count(c: Counter) = _counter = c
+
+    type Updater = PartialFunction[Context[T], (R,R)=>Option[R]]
+    private var _updater: Updater = Map.empty
+    def update(u: Updater) = _updater = u
+
+    type Deleter = PartialFunction[Context[T], R=>Boolean]
+    private var _deleter: Deleter = Map.empty
+    def delete(d: Deleter) = _deleter = d
 
     // resource converters
     //
-    def deserialize(ctx: Context, data: String): Option[R]
-    def serialize(ctx: Context, resource: R): String = toJson(resource)
-    def serialize(ctx: Context, resources: List[R]): String = toJson(resources)
+    def deserialize(ctx: Context[T], data: String): Option[R]
+    def serialize(ctx: Context[T], resource: R): String = toJson(resource)
+    def serialize(ctx: Context[T], resources: List[R]): String = toJson(resources)
 
-    private implicit def resourceToResponse(ctxAndResource: (Context, R)): ResponseFunction[Any] = {
-        JsonContent ~> ResponseString(serialize(ctxAndResource._1, ctxAndResource._2))
-    }
+    private implicit def resourceToResponse(cr: (Context[T], R)): ResponseFunction[Any] =
+        JsonContent ~> ResponseString(serialize(cr._1, cr._2))
 
-    private implicit def resourcesToResponse(ctxAndResource: (Context, List[R])): ResponseFunction[Any] = {
-        JsonContent ~> ResponseString(serialize(ctxAndResource._1, ctxAndResource._2))
-    }
+    private implicit def resourcesToResponse(cr: (Context[T], List[R])): ResponseFunction[Any] =
+        JsonContent ~> ResponseString(serialize(cr._1, cr._2))
 
-    private implicit def intToResponse(ctxAndResource: (Context, Int)): ResponseFunction[Any] = {
-        JsonContent ~> ResponseString("""{"count": %d}""" format ctxAndResource._2)
-    }
+    private implicit def intToResponse(cr: (Context[T], Int)): ResponseFunction[Any] =
+        JsonContent ~> ResponseString("""{"count": %d}""" format cr._2)
 
     private implicit def reqToResource[X](req: HttpRequest[X]): String = {
         val sw = new StringWriter
@@ -115,41 +121,38 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
     def intent = {
         unfiltered.kit.Routes.specify(
             PathPrefix -> dointent _,
-            PathPrefix + "/:resource_id" -> dointent _)
+            PathPrefix + ("/:%s" format ResourceIdParam) -> dointent _)
     }
 
-    case class Context(req: HttpRequest[_], auth: Option[T], pathIds: Map[String, String])
-    case class QueryParams(page: Option[Int] = None, size: Option[Int])
-
     private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
-        val ctx = Context(req, authService.authenticate(req), params)
+        val ctx = Context[T](req, authService.authenticate(req), params)
         req match {
-            case Accepts.Json(_) => authorize(ctx, params.get("resource_id"))(req)
+            case Accepts.Json(_) => authorize(ctx, params.get(ResourceIdParam))(req)
             case _ => NotAcceptable ~> ResponseString("You must accept application/json")
         }
     }
 
-    private def authorize(ctx: Context, resourceId: Option[String]): Plan.Intent = resourceId match {
+    private def authorize(ctx: Context[T], resourceId: Option[String]): Plan.Intent = resourceId match {
         case Some(rid) => {
 
             // PUT request must contain JSON
             //
             case req @ PUT(Path(_) & RequestContentType("application/json")) => {
-                if (!authorizeUpdate(ctx, rid)) reject(ctx, ErrPutUnauthorized)
-                else {
-                    find(rid) match {
-                        case Some(original) => {
+                _updater lift ctx match {
+                    case None => reject(ctx, ErrPutUnauthorized)
+                    case Some(u) => resolve(rid) match {
+                        case None => ErrPutCannotResolveId
+                        case Some(resolved) => {
                             deserialize(ctx, req) match {
+                                case None => ErrPutCannotDeser
                                 case Some(toUpdate) => {
-                                    update(original, toUpdate) match {
+                                    u(resolved, toUpdate) match {
                                         case Some(updated) => Ok ~> (ctx, updated)
                                         case _ => ErrPutCannotUpdate
                                     }
                                 }
-                                case _ => ErrPutCannotDeser
                             }
                         }
-                        case _ => ErrPutCannotFind
                     }
                 }
             }
@@ -157,23 +160,27 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
             // GET with id requests single resource
             //
             case req @ GET(Path(_)) => {
-                if (!authorizeGet(ctx, rid)) reject(ctx, ErrGetUnauthorized)
-                else find(rid) match {
-                    case Some(found) => Ok ~> (ctx, found)
-                    case _ => ErrGetCannotFind
+                _getter lift ctx match {
+                    case None => reject(ctx, ErrGetUnauthorized)
+                    case Some(g) => {
+                        g(rid) match {
+                            case None => ErrGetCannotResolveId
+                            case Some(found) => Ok ~> (ctx, found)
+                        }
+                    }
                 }
             }
 
             // DELETE resource by id
             //
             case req @ DELETE(Path(_)) => {
-                if (!authorizeDelete(ctx, rid)) reject(ctx, ErrDeleteUnauthorized)
-                else find(rid) match {
-                    case Some(toDelete) => {
-                        if (delete(toDelete)) Ok
-                        else ErrDeleteCannotDelete
+                _deleter lift ctx match {
+                    case None => reject(ctx, ErrDeleteUnauthorized)
+                    case Some(d) => resolve(rid) match {
+                        case None => ErrDeleteCannotResolveId
+                        case Some(resolved) =>
+                            if (d(resolved)) Ok else ErrDeleteCannotDelete
                     }
-                    case _ => ErrDeleteCannotFind
                 }
             }
 
@@ -187,51 +194,81 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
             // POST request must contain JSON
             //
             case req @ POST(Path(_) & RequestContentType("application/json")) => {
-                if (!authorizeSave(ctx)) reject(ctx, ErrPostUnauthorized)
-                else deserialize(ctx, req) match {
-                    case Some(toSave) => {
-                        save(toSave) match {
-                            case Some(saved) => Created ~> (ctx, saved)
-                            case _ => ErrPostCannotCreate
+                _creator lift ctx match {
+                    case None => reject(ctx, ErrPostUnauthorized)
+                    case Some(c) => deserialize(ctx, req) match {
+                        case None => ErrPostCannotDeser
+                        case Some(toCreate) => c(toCreate) match {
+                            case None => ErrPostCannotCreate
+                            case Some(created) => Created ~> (ctx, created)
                         }
                     }
-                    case _ => ErrPostCannotDeser
                 }
             }
 
             // GET w/o id is a query
             //
             case req @ GET(_) => {
-                if (!authorizeGetAll(ctx)) reject(ctx, ErrGetUnauthorized)
-
-                object Page extends Params.Extract("page", Params.first ~> Params.int)
-                object Size extends Params.Extract("size", Params.first ~> Params.int)
+                
+                /*
+                 * query 'count' flag extractor
+                 */
                 object Count extends Params.Extract("count", Params.first ~> {
                     case Some(flag) => if (flag == "true" || flag == "TRUE" || flag == "1") Some(true) else Some(false)
                     case _ => None
                 })
-
+                
                 req match {
-                    case Params(Count(flag)) if (flag) =>
-                        Ok ~> (ctx -> count(ctx, QueryParams(None, None)))
-                    case Params(Page(p) & Size(s)) => {
-                        val sz = MaxPageSize match {
-                            case Some(max) => if (max > s) s else max
-                            case None => s
-                        }
-                        Ok ~> (ctx -> query(ctx, QueryParams(Some(p), Some(sz))))
+
+                    // count flag is true - we only want the
+                    // total # of resources that the query represents
+                    //
+                    case Params(Count(flag)) if (flag) => _counter lift (ctx) match {
+                        case None => reject(ctx, ErrCountUnauthorized)
+                        case Some(c) => Ok ~> (ctx -> c())
                     }
-                    case Params(Size(s)) => {
-                        val sz = MaxPageSize match {
-                            case Some(max) => if (max > s) s else max
-                            case None => s
-                        }
-                        Ok ~> (ctx -> query(ctx, QueryParams(None, Some(sz))))
-                    }
-                    case _ => {
-                        MaxPageSize match {
-                            case Some(max) => Ok ~> (ctx -> query(ctx, QueryParams(None, Some(max))))
-                            case None => Ok ~> (ctx -> query(ctx, QueryParams(None, None)))
+                    
+                    case _ => _querier lift ctx match {
+                        case None => reject(ctx, ErrGetUnauthorized)
+                        case Some(q) => {
+
+                            /*
+                             * 'page' and 'size' param extractors
+                             */
+                            object Page extends Params.Extract("page", Params.first ~> Params.int)
+                            object Size extends Params.Extract("size", Params.first ~> Params.int)
+
+                            req match {
+                                // page and size present -
+                                // paginate query results accordingly
+                                //
+                                case Params(Page(p) & Size(s)) => {
+                                    val sz = MaxPageSize match {
+                                        case Some(max) => if (max > s) s else max
+                                        case None => s
+                                    }
+                                    Ok ~> (ctx -> q(QueryParams(Some(p), Some(sz))))
+                                }
+                                // only size present -
+                                // limit query results accordingly
+                                //
+                                case Params(Size(s)) => {
+                                    val sz = MaxPageSize match {
+                                        case Some(max) => if (max > s) s else max
+                                        case None => s
+                                    }
+                                    Ok ~> (ctx -> q(QueryParams(None, Some(sz))))
+                                }
+                                // no pagination params - only limit
+                                // query results by MaxPageSize value
+                                //
+                                case _ => {
+                                    MaxPageSize match {
+                                        case Some(max) => Ok ~> (ctx -> q(QueryParams(None, Some(max))))
+                                        case None => Ok ~> (ctx -> q(QueryParams(None, None)))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -243,7 +280,7 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
         }
     }
 
-    private def fail(ctx: Context): ErrorResponse = ctx.req match {
+    private def fail(ctx: Context[T]): ErrorResponse = ctx.req match {
 
         // determine correct errors by process of elimination
         //
@@ -265,18 +302,19 @@ object ErrPostCannotDeser extends ErrorResponse(BadRequest, 1002, "unable to des
 object ErrPostNotJson extends ErrorResponse(UnsupportedMediaType, 1003, "content-type must be application/json")
 
 object ErrPutUnauthorized extends ErrorResponse(Unauthorized, 2000, "unauthorized")
-object ErrPutCannotFind extends ErrorResponse(NotFound, 2001, "unknown id")
+object ErrPutCannotResolveId extends ErrorResponse(NotFound, 2001, "unknown id")
 object ErrPutCannotUpdate extends ErrorResponse(BadRequest, 2002, "unable to update resource")
 object ErrPutCannotDeser extends ErrorResponse(BadRequest, 2003, "unable to deserialize resource from content")
 object ErrPutMissingId extends ErrorResponse(NotFound, 2004, "resource id required in path")
 object ErrPutNotJson extends ErrorResponse(UnsupportedMediaType, 2005, "content-type must be application/json")
 
 object ErrGetUnauthorized extends ErrorResponse(Unauthorized, 3000, "unauthorized")
-object ErrGetCannotFind extends ErrorResponse(NotFound, 3001, "unknown id")
-object ErrGetMissingId extends ErrorResponse(NotFound, 3002, "resource id required in path")
+object ErrCountUnauthorized extends ErrorResponse(Unauthorized, 3001, "unauthorized")
+object ErrGetCannotResolveId extends ErrorResponse(NotFound, 3002, "unknown id")
+object ErrGetMissingId extends ErrorResponse(NotFound, 3003, "resource id required in path")
 
 object ErrDeleteUnauthorized extends ErrorResponse(Unauthorized, 4000, "unauthorized")
-object ErrDeleteCannotFind extends ErrorResponse(NotFound, 4001, "unknown id")
+object ErrDeleteCannotResolveId extends ErrorResponse(NotFound, 4001, "unknown id")
 object ErrDeleteCannotDelete extends ErrorResponse(BadRequest, 4002, "unable to delete resource")
 object ErrDeleteMissingId extends ErrorResponse(NotFound, 4003, "resource id required in path")
 
@@ -288,17 +326,17 @@ object ErrBadMethod { def apply(method: String) = new ErrBadMethod("%s not suppo
  */
 import net.liftweb.json._
 object BigDecimalSerializer extends Serializer[BigDecimal] {
-  private val Class = classOf[BigDecimal]
-  
-  def deserialize(implicit format: Formats): PartialFunction[(TypeInfo, JValue), BigDecimal] = {
-    case (TypeInfo(Class, _), json) => json match {
-      case JInt(iv) => BigDecimal(iv)
-      case JDouble(dv) => BigDecimal(dv)
-      case value => throw new MappingException("Can't convert " + value + " to " + Class)
-    }
-  }
+    private val Class = classOf[BigDecimal]
 
-  def serialize(implicit format: Formats): PartialFunction[Any, JValue] = {
-    case d: BigDecimal => JDouble(d.doubleValue)
-  }
+    def deserialize(implicit format: Formats): PartialFunction[(TypeInfo, JValue), BigDecimal] = {
+        case (TypeInfo(Class, _), json) => json match {
+            case JInt(iv) => BigDecimal(iv)
+            case JDouble(dv) => BigDecimal(dv)
+            case value => throw new MappingException("Can't convert " + value + " to " + Class)
+        }
+    }
+
+    def serialize(implicit format: Formats): PartialFunction[Any, JValue] = {
+        case d: BigDecimal => JDouble(d.doubleValue)
+    }
 }

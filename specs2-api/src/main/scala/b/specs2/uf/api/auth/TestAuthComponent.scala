@@ -9,7 +9,6 @@ trait TestAuthComponent[T,R] extends BasicResourceAuthComponent[T,R]
 		with TokenComponent[T] with SessionComponent[T,R] with Mockito {
 
     // need to override
-    def credentialsToToken: (String,String) => T
     def tokenToSession: (String,T) => R
     def sessionToId: R => String
 
@@ -49,10 +48,8 @@ trait TestAuthComponent[T,R] extends BasicResourceAuthComponent[T,R]
     // mock up tokenService calls
     //
     org.mockito.Mockito.doReturn(None) when tokenService lookup (anyString, anyString)
-    def addTestUser(user: (String,String)) = {
-        val u = user._1
-        val p = user._2
-        org.mockito.Mockito.doReturn(Some(credentialsToToken(u,p))) when tokenService lookup (u, p)
+    def mockTokenLookup(u: String, p: String, token: T) = {
+        org.mockito.Mockito.doReturn(Some(token)) when tokenService lookup (u, p)
     }
 }
 

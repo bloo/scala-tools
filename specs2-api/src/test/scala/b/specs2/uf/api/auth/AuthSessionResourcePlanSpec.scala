@@ -11,14 +11,17 @@ case class Session(id: String, user: String)
 class AuthSessionResourcePlanSpec
     extends b.specs2.uf.api.ResourcePlanSpecBase[Token, Session, AuthSessionResourcePlan[Token, Session]] {
 
-    val requestingToken = Token("user", "pass")
+    val MockUser = Token("user", "pass")
     // implicit 'requester' for all http calls
-    implicit val requester = Some(requestingToken.user -> requestingToken.pass)
+    implicit val testRequester = Some(MockUser.user -> MockUser.pass)
+    lazy val resourcePlan = new b.uf.api.auth.AuthSessionResourcePlan[Token, Session]
+        with TestAuthComponent[Token, Session] {
 
-    def resourcePlan = new b.uf.api.auth.AuthSessionResourcePlan[Token, Session] with TestAuthComponent[Token, Session] {
-        def credentialsToToken = (u, p) => Token(u, p)
         def tokenToSession = (id, token) => Session(id, token.user)
         def sessionToId = _.id
+
+        // requesting user is valid user during lookup
+        mockTokenLookup(MockUser.user, MockUser.pass, MockUser)
     }
 
     val LoginJsonContent = """{"remember":false}"""
@@ -27,7 +30,7 @@ class AuthSessionResourcePlanSpec
 
         "authorize valid login request" in {
             val sess = post(LoginJsonContent)
-            sess.user must be_==(requestingToken.user)
+            sess.user must be_==(MockUser.user)
         }
 
         "authorize and retrieve authorized session" in {
