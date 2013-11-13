@@ -1,10 +1,9 @@
 package b.slick
 
+import b.log.Logger
 import scala.slick.jdbc.ResultSetConcurrency
 import scala.slick.jdbc.ResultSetHoldability
 import scala.slick.jdbc.ResultSetType
-import b.common.Logger
-//import scala.slick.jdbc.Database
 import scala.slick.driver.JdbcProfile
 import scala.slick.profile.BasicDriver
 import java.sql.Connection

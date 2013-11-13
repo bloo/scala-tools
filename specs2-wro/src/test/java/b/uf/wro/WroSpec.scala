@@ -5,7 +5,7 @@ import org.specs2.runner.JUnitRunner
 import org.specs2.mutable.Specification
 import org.specs2._
 import org.specs2.mock._
-import b.common.Logger
+import b.log.Logger
 
 @RunWith(classOf[JUnitRunner])
 class WroSpec extends Specification with Mockito with Logger {

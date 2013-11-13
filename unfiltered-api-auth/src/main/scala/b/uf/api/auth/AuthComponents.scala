@@ -32,7 +32,7 @@ trait SessionComponent[T,S] {
  *  ResourceAuthComponent implementation based on HTTP BasicAuth
  */
 
-trait BasicResourceAuthComponent[T,S] extends b.uf.api.ResourceAuthComponent[T] with b.common.Logger {
+trait BasicResourceAuthComponent[T,S] extends b.uf.api.ResourceAuthComponent[T] with b.log.Logger {
 	this: TokenComponent[T] with SessionComponent[T,S] =>
 
 	private lazy val _as = new BasicAuthService

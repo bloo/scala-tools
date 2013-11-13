@@ -1,4 +1,4 @@
-package b.common.scalate
+package b.scalate
 
 import org.fusesource.scalate.layout.DefaultLayoutStrategy
 import org.fusesource.scalate.DefaultRenderContext
@@ -14,7 +14,7 @@ object ScalateEngine {
     type ToRenderContext = (String, PrintWriter, TemplateEngine) => RenderContext
 }
 
-class ScalateEngine(templateExt: String, templatePath: String, layoutTemplate: String) extends b.common.Logger {
+class ScalateEngine(templateExt: String, templatePath: String, layoutTemplate: String) extends b.log.Logger {
     private val engine = new TemplateEngine
     engine.layoutStrategy = new DefaultLayoutStrategy(engine, templatePath + "/" + layoutTemplate)
     private val renderContext: ScalateEngine.ToRenderContext = (path, writer, engine) => new DefaultRenderContext(path, engine, writer)

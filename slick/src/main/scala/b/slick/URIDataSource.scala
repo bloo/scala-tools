@@ -10,7 +10,7 @@ package b.slick
  * --------+++--------------+----------+-----------------------------------------+----/--------------
  * postgres://ymhoznyjspdouz:By3wzE3bku@ec2-55-111-999-77.compute-1.amazonaws.com:5432/fdcgv1k7irje8a
  */
-object URIDataSource extends b.common.Logger {
+object URIDataSource extends b.log.Logger {
 
     def apply(uri: java.net.URI, min: Int, max: Int) = {
         DB(uri.getScheme) { dbc: DatabaseComponent =>

@@ -53,12 +53,13 @@
 			<groupId>org.fusesource.scalamd</groupId>
 			<artifactId>scalamd_${sv}</artifactId>
 		</dependency>
-		<!-- optional dep for S3 based fileservice implementation -->
+		
+		<!-- optional dep for S3 based storage implementation -->
 		<dependency>
 			<groupId>net.java.dev.jets3t</groupId>
 			<artifactId>jets3t</artifactId>
 			<optional>true</optional>
 		</dependency>
 	</dependencies>
-	
+
 </project>

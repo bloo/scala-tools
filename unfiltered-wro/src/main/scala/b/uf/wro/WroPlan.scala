@@ -26,7 +26,7 @@ import ro.isdc.wro.model.resource.processor.impl.js.SemicolonAppenderPreProcesso
 import ro.isdc.wro.model.resource.processor.ResourcePreProcessor
 import ro.isdc.wro.model.resource.processor.ResourcePostProcessor
 import ro.isdc.wro.util.StopWatch
-import b.common.Logger
+import b.log.Logger
 
 object Wro {
     var gzip = true // false
@@ -64,7 +64,7 @@ object Wro {
     def aggOnlyPlan(wroXml: String) = new WroPlan(wroXml) plan
 }
 
-class WroPlan(file: String) extends b.common.Logger {
+class WroPlan(file: String) extends Logger {
 
     logger info ("Building WRO plan for: %s" format file)
     

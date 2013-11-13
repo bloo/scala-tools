@@ -1,6 +1,6 @@
 package b.slick
 
-object PooledDataSource extends b.common.Logger {
+object PooledDataSource extends b.log.Logger {
 
     def apply(driverClassName: String, jdbcUrl: String, user: String, password: Option[String], min: Int, max: Int) = {
 

@@ -4,7 +4,7 @@ package b.uf.scalate
 import unfiltered.request._
 import unfiltered.response._
 import java.io.OutputStreamWriter
-import b.common.scalate._
+import b.scalate._
 
 object Scalate {
     private var cfg: ScalateEngine = null
@@ -14,7 +14,7 @@ object Scalate {
     }
 }
 
-trait Scalate extends b.common.Logger {
+trait Scalate extends b.log.Logger {
 
     def global(attr: (String, Any)) = globals = globals :+ attr
     def prefix(pre: String) = pathPrefix = pre

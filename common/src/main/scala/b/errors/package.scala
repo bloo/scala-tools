@@ -4,7 +4,7 @@ package object errors {
 	
 	type ErrorMessage = ErrorMgr.Message
     
-    object ErrorMgr extends b.common.Logger {
+    object ErrorMgr extends b.log.Logger {
         val codes = scala.collection.mutable.ListBuffer[Int]()
 	    class Message(val code: Int, val messages: String*) {
 	        if (codes.contains(code))

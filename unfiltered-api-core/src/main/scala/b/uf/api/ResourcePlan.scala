@@ -14,7 +14,6 @@ import unfiltered.request._
 import unfiltered.response._
 import unfiltered.response.ResponseString
 import unfiltered.response.Unauthorized
-import b.common.Logger
 import b.uf.errors._
 
 case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String, String]) {
@@ -46,8 +45,8 @@ object ResourcePlan {
     }
 }
 
-abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: String, MaxPageSize: Option[Int] = None) extends Plan with Logger {
-    this: ResourceAuthComponent[T] =>
+abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: String, MaxPageSize: Option[Int] = None)
+	extends Plan with b.log.Logger { this: ResourceAuthComponent[T] =>
 
     lazy val PathConfig = (Version, Group, ResourcePath)
     lazy val PathPrefix = "/api/%s/%s/%s" format ("v" + Version, Group, ResourcePath)

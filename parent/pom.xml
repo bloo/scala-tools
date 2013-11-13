@@ -72,7 +72,8 @@
 		<!-- common - utils -->
 		<commons-io.version>2.4</commons-io.version>
 
-		<!-- common - files -->
+		<!-- common - storage -->
+		<!-- <aws-sdk.version>1.6.4</aws-sdk.version> 10.5MB vs 528KB -->
 		<jets3t.version>0.9.0</jets3t.version>
 		
 		<!-- slick -->
@@ -156,6 +157,14 @@
 				<version>${commons-io.version}</version>
 			</dependency>
 
+<!--        use jets3t instead of aws-sdk b/c we only want it for s3
+			and the jar size diff is 10.5 MB vs 528 KB -->
+
+<!-- 			<dependency> -->
+<!-- 				<groupId>com.amazonaws</groupId> -->
+<!-- 				<artifactId>aws-java-sdk</artifactId> -->
+<!-- 				<version>${aws-sdk.version}</version> -->
+<!-- 			</dependency> -->
 			<dependency>
 				<groupId>net.java.dev.jets3t</groupId>
 				<artifactId>jets3t</artifactId>
