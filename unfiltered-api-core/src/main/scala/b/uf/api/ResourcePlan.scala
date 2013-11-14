@@ -109,9 +109,13 @@ abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: Str
         JsonContent ~> ResponseString("""{"count": %d}""" format cr._2)
 
     private implicit def reqToResource[X](req: HttpRequest[X]): String = {
-        val sw = new StringWriter
-        IOUtils.copy(req.inputStream, sw)
-        sw.toString
+        val in = req inputStream
+        val out = new StringWriter
+        IOUtils.copy(in, out)
+        IOUtils closeQuietly in
+        val resp = out.toString
+        IOUtils closeQuietly out
+        resp
     }
 
     case class ResourceErrorJson(val code: Int, val messages: Seq[String])

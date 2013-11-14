@@ -6,7 +6,6 @@ import org.specs2.mutable.Specification
 import org.specs2._
 import org.specs2.mock._
 import b.log.Logger
-import org.apache.commons.io.IOUtils
 import java.io.StringWriter
 
 trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
@@ -55,10 +54,7 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
     private def _reqToStatusAndResult(req: dispatch.classic.Request)(implicit mf: Manifest[R]): Handler[(Int,Option[R])] = {
         req >:> Predef.identity apply {
             case (status, _, Some(entity), _) if status == 200 | status == 201 => {
-		    	val sw = new StringWriter
-		    	IOUtils.copy(entity.getContent, sw)
-		    	val jsonOut = sw.toString
-		    	logger info "JSON ouput" + jsonOut
+		    	val jsonOut = _entityToJson(entity)
                 (status, Some(fromJson[R](jsonOut)))
             }
             case (status, _, _, _) => (status, None)
@@ -68,16 +64,24 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
     private def _reqToStatusAndResults(req: dispatch.classic.Request)(implicit mf: Manifest[R]): Handler[(Int,Option[List[R]])] = {
         req >:> Predef.identity apply {
             case (status, _, Some(entity), _) if status == 200 | status == 201 => {
-		    	val sw = new StringWriter
-		    	IOUtils.copy(entity.getContent, sw)
-		    	val jsonOut = sw.toString
-		    	logger info "JSON ouput" + jsonOut
+		    	val jsonOut = _entityToJson(entity)
                 (status, Some(fromJson[List[R]](jsonOut)))
             }
             case (status, _, _, _) => (status, None)
         }
     }
 
+    private def _entityToJson(entity: org.apache.http.HttpEntity): String = {
+    	val out = new StringWriter
+    	val in = entity.getContent
+    	import org.apache.commons.io.IOUtils
+    	IOUtils copy(in, out)
+    	IOUtils closeQuietly in
+    	val json = out.toString
+    	IOUtils closeQuietly out
+    	json
+    }
+    
     private def _reqToStatus(req: dispatch.classic.Request): Handler[Int] =
 	    req >:> Predef.identity apply { case (status,_,_,_) => status }
 

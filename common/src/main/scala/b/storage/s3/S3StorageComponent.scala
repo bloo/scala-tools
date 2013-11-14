@@ -62,7 +62,11 @@ trait S3StorageComponent[T] extends StorageComponent[T] {
                 // upload stream to temp file
                 // so we can calculate content-length
                 //
-                val file = _upload(is) // blocks!
+	    	    val file = File.createTempFile("b.common.storage.s3.storage-service", ".dat")
+	   			val out = new FileOutputStream(file);
+	    	    IOUtils.copy(is, out)
+	    	    IOUtils closeQuietly out
+                IOUtils closeQuietly is
 
                 // create S3 object to put up into AWS
                 //
@@ -97,13 +101,6 @@ trait S3StorageComponent[T] extends StorageComponent[T] {
     		import org.apache.commons.io.FilenameUtils
     		// convert /foo/bar/baz.txt => foo/bar
     		FilenameUtils.getPath(url.getPath)
-    	}
-    	
-    	def _upload(is: InputStream): File = {
-    	    val file = File.createTempFile("b.common.storage.s3.storage-service", ".dat")
-   			val out = new FileOutputStream(file);
-    	    IOUtils.copy(is, out)
-    	    file
-    	}
+    	}    	
     }
 }
