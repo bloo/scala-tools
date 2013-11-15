@@ -82,7 +82,7 @@
 		<c3p0.version>0.9.1.2</c3p0.version>
 
 		<!-- unfiltered-core -->
-		<unfiltered.version>0.7.0</unfiltered.version>
+		<unfiltered.version>0.7.1</unfiltered.version>
 		<scalate.version>1.6.1</scalate.version>
 		<scalamd.version>1.6</scalamd.version>
 
