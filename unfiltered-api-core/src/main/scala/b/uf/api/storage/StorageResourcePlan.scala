@@ -4,11 +4,10 @@ import b.storage._
 import b.uf.api._
 
 abstract class StorageResourcePlan[T](
-    Version: Int,
-    Group: String,
+    Version: Double,
     ResourcePath: String,
     MaxPageSize: Option[Int] = None)
-    extends ResourcePlan[T, ObjectMeta[T]](Version, Group, ResourcePath, MaxPageSize) 
+    extends ResourcePlan[T, ObjectMeta[T]](Version, ResourcePath, MaxPageSize) 
     with b.log.Logger {
     this: ResourceAuthComponent[T] with StorageComponent[T] =>
 

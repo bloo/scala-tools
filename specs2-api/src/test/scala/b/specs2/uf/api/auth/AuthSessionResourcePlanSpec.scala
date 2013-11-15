@@ -14,7 +14,7 @@ class AuthSessionResourcePlanSpec
     val MockUser = Token("user", "pass")
     // implicit 'requester' for all http calls
     implicit val testRequester = Some(MockUser.user -> MockUser.pass)
-    lazy val resourcePlan = new b.uf.api.auth.AuthSessionResourcePlan[Token, Session]
+    lazy val resourcePlan = new b.uf.api.auth.AuthSessionResourcePlan[Token, Session](1.0, "auth/sessions")
         with TestAuthComponent[Token, Session] {
 
         def tokenToSession = (id, token) => Session(id, token.user)

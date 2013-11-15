@@ -45,11 +45,11 @@ object ResourcePlan {
     }
 }
 
-abstract class ResourcePlan[T, R](Version: Int, Group: String, ResourcePath: String, MaxPageSize: Option[Int] = None)
+abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPageSize: Option[Int] = None)
 	extends Plan with b.log.Logger { this: ResourceAuthComponent[T] =>
 
-    lazy val PathConfig = (Version, Group, ResourcePath)
-    lazy val PathPrefix = "/api/%s/%s/%s" format ("v" + Version, Group, ResourcePath)
+    lazy val PathConfig = (Version, ResourcePath)
+    lazy val PathPrefix = "/api/%s/%s" format ("v" + Version, ResourcePath)
     private val ResourceIdParam = "resource_id"
 
     def toJson(obj: Any): String = ResourcePlan toJson obj

@@ -24,7 +24,7 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
     //
     def pathPrefix: String = {
         val cfg = resourcePlan.PathConfig
-        "api/v%d/%s/%s" format (cfg._1, cfg._2, cfg._3)
+        "api/v%f/%s" format (cfg._1, cfg._2)
     }
 
     // http://dispatch-classic.databinder.net/Try+Dispatch.html

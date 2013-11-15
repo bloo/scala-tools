@@ -9,7 +9,7 @@ import net.liftweb.json.render
 import unfiltered.request.{ BasicAuth, Params }
 import unfiltered.request.HttpRequest
 
-class AuthSessionResourcePlan[T, S] extends ResourcePlan[T, S](1, "auth", "sessions")
+class AuthSessionResourcePlan[T, S](v: Double, path: String) extends ResourcePlan[T, S](v, path)
     with BasicResourceAuthComponent[T, S] {
     this: TokenComponent[T] with SessionComponent[T, S] =>
 

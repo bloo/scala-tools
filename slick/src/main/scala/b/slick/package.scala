@@ -1,5 +1,6 @@
 package b
 
+import org.joda.time.DateTimeZone
 package object slick {
 
     // import the slick driver's "query language" imports
@@ -19,10 +20,17 @@ package object slick {
 
     // sql.Timestamp <-> joda.DateTime type mapper
     //
-    implicit val sql_2_joda_slickTypeMapper: BaseTypedType[DateTime] =
+    implicit val sql_2_jodaDateTime_slickTypeMapper =
         MappedColumnType.base[DateTime, Timestamp](
             d => new Timestamp(d getMillis),
             t => new DateTime(t getTime, UTC))
+
+    // String <-> joda.DateTimeZone type mapper
+    //
+    implicit val sql_2_jodaDateTimeTZ_slickTypeMapper =
+        MappedColumnType.base[DateTimeZone, String](
+            tz => tz.getID,
+            s => DateTimeZone.forID(s))
 
     abstract class DBTable[T](tag: Tag, tableName: String)
         extends Table[T](tag: Tag, DB.component.entityName(tableName)) {}
@@ -37,13 +45,21 @@ package object slick {
     }
 
     import simple.{ Query, queryToAppliedQueryInvoker }
-    class QueryPager[QQ, R](q: Query[QQ, _ <: R]) {
-        def paginate(pp: QueryPager.PagerParams)(implicit s: Session): List[R] = paginate(pp.page, pp.size)
-        def paginate(page: Option[Int], size: Option[Int])(implicit s: Session) = {
-            (size match {
-                case Some(sz) => q.drop(sz * (page.getOrElse(1) - 1)).take(sz)
+    class QueryPager[QQ, R](q: Query[QQ, _ <: R]) extends b.log.Logger {
+        def paginate[O <% scala.slick.lifted.Ordered](pp: QueryPager.PagerParams, sorter: QQ=>O)(implicit s: Session): List[R] = paginate(pp.page, pp.size, sorter)
+        def paginate[O <% scala.slick.lifted.Ordered](page: Option[Int], size: Option[Int], sorter: QQ=>O)(implicit s: Session) = {
+            val pq = (size match {
+                case Some(sz) => {
+                    val ps = (page getOrElse 1) - 1
+                    q.drop(sz * (if (ps < 0) 0 else ps)).take(sz)
+                }
                 case None => q
-            }).list
+            })
+            pq sortBy sorter
+            logger.info(pq.selectStatement)
+//            if (logger.isDebugEnabled)
+//                logger.dbug(pq.selectStatement)
+            pq.list
         }
     }
 
