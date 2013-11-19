@@ -10,12 +10,16 @@ package object params {
         case _ => None
     })
 
-    class DatePatternParam(paramName: String, format: String) extends Params.Extract(paramName, Params.first ~> {
+    abstract class DatePatternParam(paramName: String, format: String) extends Params.Extract(paramName, Params.first ~> {
         case Some(dateStr) => Some(DateTimeFormat.forPattern(format).parseDateTime(dateStr))
         case _ => None
     })
 
-    class DateParam(pn: String) extends DatePatternParam(pn, "yyyy-MM-dd")
-    class TimeParam(pn: String) extends DatePatternParam(pn, "HH:mm:ss")
-    class DateTimeParam(pn: String) extends DatePatternParam(pn, "yyyy-MM-dd:HH:mm:ss")
+    abstract class DateParam(pn: String) extends DatePatternParam(pn, "yyyy-MM-dd")
+    abstract class TimeParam(pn: String) extends DatePatternParam(pn, "HH:mm:ss")
+    abstract class DateTimeParam(pn: String) extends DatePatternParam(pn, "yyyy-MM-dd:HH:mm:ss")
+    
+    abstract class LongSeq(paramName: String) extends Params.Extract(paramName, { vals => Some(vals.map(_.toLong)) })
+    abstract class IntSeq(paramName: String) extends Params.Extract(paramName, { vals => Some(vals.map(_.toInt)) })
+
 }
