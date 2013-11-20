@@ -46,7 +46,7 @@ object ResourcePlan {
 }
 
 abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPageSize: Option[Int] = None)
-	extends Plan with b.log.Logger { this: ResourceAuthComponent[T] =>
+    extends Plan with b.log.Logger { this: ResourceAuthComponent[T] =>
 
     lazy val PathConfig = (Version, ResourcePath)
     lazy val PathPrefix = "/api/%s/%s" format ("v" + Version, ResourcePath)
@@ -77,7 +77,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
     private var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
 
-    type Querier = PartialFunction[Context[T], QueryParams => List[R]]
+    type Querier = PartialFunction[Context[T], QueryParams => Seq[R]]
     private var _querier: Querier = Map.empty
     def query(q: Querier) = _querier = q
 
@@ -96,14 +96,30 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
     // resource converters
     //
     def deserialize(ctx: Context[T], data: String): R = fromJson(data)
-    def serialize(ctx: Context[T], resource: R): String = toJson(resource)
-    def serialize(ctx: Context[T], resources: List[R]): String = toJson(resources)
+    def serialize(ctx: Context[T], resource: Any): String = toJson(resource)
+    //def serialize(ctx: Context[T], resources: List[Any]): String = toJson(resources)
 
     private implicit def resourceToResponse(cr: (Context[T], R)): ResponseFunction[Any] =
         JsonContent ~> ResponseString(serialize(cr._1, cr._2))
 
-    private implicit def resourcesToResponse(cr: (Context[T], List[R])): ResponseFunction[Any] =
-        JsonContent ~> ResponseString(serialize(cr._1, cr._2))
+    private implicit def resourcesToResponse(cr: (Context[T], Seq[R], Option[Int], Option[Int])): ResponseFunction[Any] = {
+    	case class Group(val group: Seq[Any])
+        val groups = cr._3
+        val groupSize = cr._4
+        var list: Seq[Any] = cr._2
+        list = groups match {
+            case Some(gCnt) => {
+                val gSize = math.ceil(list.length / gCnt.toDouble).toInt
+                list.grouped(gSize).toSeq.map(Group(_))
+            }
+            case None => list
+        }
+        list = groupSize match {
+            case Some(gSize) => list.grouped(gSize).toSeq.map(Group(_))
+            case None => list
+        }        
+        JsonContent ~> ResponseString(serialize(cr._1, list))
+    }
 
     private implicit def intToResponse(cr: (Context[T], Int)): ResponseFunction[Any] =
         JsonContent ~> ResponseString("""{"count": %d}""" format cr._2)
@@ -239,6 +255,18 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                              */
                             object Page extends Params.Extract("page", Params.first ~> Params.int)
                             object Size extends Params.Extract("size", Params.first ~> Params.int)
+                            object GroupCnt extends Params.Extract("groups", Params.first ~> Params.int)
+                            object GroupSize extends Params.Extract("groupsize", Params.first ~> Params.int)
+                            
+                            val groupCnt = req match {
+                                case Params(GroupCnt(gc)) => Some(gc)
+                                case _ => None
+                            }
+
+                            val groupSize = req match {
+                                case Params(GroupSize(g)) => Some(g)
+                                case _ => None
+                            }
 
                             req match {
                                 // page and size present -
@@ -249,7 +277,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
-                                    Ok ~> (ctx -> q(QueryParams(Some(p), Some(sz))))
+                                    Ok ~> (ctx, q(QueryParams(Some(p), Some(sz))), groupCnt, groupSize)
                                 }
                                 // only size present -
                                 // limit query results accordingly
@@ -259,15 +287,15 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
-                                    Ok ~> (ctx -> q(QueryParams(None, Some(sz))))
+                                    Ok ~> (ctx, q(QueryParams(None, Some(sz))), groupCnt, groupSize)
                                 }
                                 // no pagination params - only limit
                                 // query results by MaxPageSize value
                                 //
                                 case _ => {
                                     MaxPageSize match {
-                                        case Some(max) => Ok ~> (ctx -> q(QueryParams(None, Some(max))))
-                                        case None => Ok ~> (ctx -> q(QueryParams(None, None)))
+                                        case Some(max) => Ok ~> (ctx, q(QueryParams(None, Some(max))), groupCnt, groupSize)
+                                        case None => Ok ~> (ctx, q(QueryParams(None, None)), groupCnt, groupSize)
                                     }
                                 }
                             }
@@ -275,10 +303,6 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                     }
                 }
             }
-
-            // fall through
-            //
-            case _ => fail(ctx)
         }
     }
 
