@@ -48,14 +48,14 @@ package object slick {
     class QueryPager[QQ, R](q: Query[QQ, _ <: R]) extends b.log.Logger {
         def paginate[O <% scala.slick.lifted.Ordered](pp: QueryPager.PagerParams, sorter: QQ=>O)(implicit s: Session): List[R] = paginate(pp.page, pp.size, sorter)
         def paginate[O <% scala.slick.lifted.Ordered](page: Option[Int], size: Option[Int], sorter: QQ=>O)(implicit s: Session) = {
+            val sorted = q sortBy sorter
             val pq = (size match {
                 case Some(sz) => {
                     val ps = (page getOrElse 1) - 1
-                    q.drop(sz * (if (ps < 0) 0 else ps)).take(sz)
+                    sorted.drop(sz * (if (ps < 0) 0 else ps)).take(sz)
                 }
-                case None => q
+                case None => sorted
             })
-            pq sortBy sorter
             logger.info(pq.selectStatement)
 //            if (logger.isDebugEnabled)
 //                logger.dbug(pq.selectStatement)
