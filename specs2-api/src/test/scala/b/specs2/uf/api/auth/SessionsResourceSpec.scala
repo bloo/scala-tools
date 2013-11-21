@@ -8,13 +8,14 @@ case class Token(user: String, pass: String)
 case class Session(id: String, user: String)
 
 @RunWith(classOf[JUnitRunner])
-class AuthSessionResourcePlanSpec
-    extends b.specs2.uf.api.ResourcePlanSpecBase[Token, Session, AuthSessionResourcePlan[Token, Session]] {
-
+class SessionsResourceSpec
+    extends b.specs2.uf.api.ResourceSpecBase[Token, Session, SessionsResource[Token, Session]] {
+    
     val MockUser = Token("user", "pass")
     // implicit 'requester' for all http calls
     implicit val testRequester = Some(MockUser.user -> MockUser.pass)
-    lazy val resourcePlan = new b.uf.api.auth.AuthSessionResourcePlan[Token, Session](1.0, "auth/sessions")
+    
+	override def resource = new SessionsResource[Token, Session]
         with TestAuthComponent[Token, Session] {
 
         def tokenToSession = (id, token) => Session(id, token.user)
@@ -22,7 +23,7 @@ class AuthSessionResourcePlanSpec
 
         // requesting user is valid user during lookup
         mockTokenLookup(MockUser.user, MockUser.pass, MockUser)
-    }
+    }   
 
     val LoginJsonContent = ("remember" -> "true")
     

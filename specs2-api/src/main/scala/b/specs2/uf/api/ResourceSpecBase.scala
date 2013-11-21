@@ -8,7 +8,7 @@ import org.specs2.mock._
 import b.log.Logger
 import java.io.StringWriter
 
-trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
+trait ResourceSpecBase[T, R, RR <: b.uf.api.Resource[T,R]]
     extends Specification with Mockito with Served with Logger {
 
     // tuple type representing the user/pass credentials of whomever 
@@ -18,21 +18,26 @@ trait ResourcePlanSpecBase[T, R, P <: b.uf.api.ResourcePlan[T,R]]
 
     // needs to be overridden in spec to provide actual instance of ResourcePlan
     //
-    def resourcePlan: P
+    def resource: RR
+    val group: Option[String] = None
+    val version: Double = 1.0
     
     // get our path prefix from the ResourcePlan instance
     //
-    def pathPrefix: String = {
-        val cfg = resourcePlan.PathConfig
-        "api/v%f/%s" format (cfg._1, cfg._2)
-    }
+    private var _pathPrefix: Option[String] = None
+    def pathPrefix: String = _pathPrefix.get
 
     // http://dispatch-classic.databinder.net/Try+Dispatch.html
     import dispatch.classic._
-    import b.uf.api.ResourcePlan.fromJson
+    import b.uf.api.Resource.fromJson
 
     // from: unfiltered.specs2.jetty.Served
-    def setup = _.plan(resourcePlan)
+    def setup = { server =>
+    	val res = resource
+    	val plan = res.plan(group, version)
+    	_pathPrefix = Some(res.FullPath.replaceFirst("/", ""))        
+        server.plan(plan)        
+    } 
 
     def newReq(id: String, requester: Option[Requester], params: Seq[(String,String)]): Request =
         newReq(Some(id), requester, params)

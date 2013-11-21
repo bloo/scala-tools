@@ -16,13 +16,26 @@ import unfiltered.response.ResponseString
 import unfiltered.response.Unauthorized
 import b.uf.errors._
 
+/**
+ * A helper that will JSON serialize BigDecimal
+ */
+import net.liftweb.json._
+import unfiltered.filter.request.ContextPath
+
 case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String, String]) {
     def hasAuth = !auth.isEmpty
 }
 case class QueryParams(page: Option[Int] = None, size: Option[Int])
 
-object ResourcePlan {
+object Resource {
 
+    def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)
+		(resources: Resource[T,_]*) = {
+		val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
+		    case(res,plan) => res.FullPath }
+		list.reverse.foreach { case(res,plan) => cb.filter(plan) }
+	}
+	
     var prettyJson = false
 
     // helper json serializer
@@ -45,19 +58,51 @@ object ResourcePlan {
     }
 }
 
-abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPageSize: Option[Int] = None)
-    extends Plan with b.log.Logger { this: ResourceAuthComponent[T] =>
+abstract class Resource[T, R](
+        val resourcePath: String,
+        val maxPageSize: Option[Int] = None)
+    extends b.log.Logger {
+    
+    this: ResourceAuthComponent[T] =>
 
-    lazy val PathConfig = (Version, ResourcePath)
-    lazy val PathPrefix = "/api/%s/%s" format ("v" + Version, ResourcePath)
-    private val ResourceIdParam = "resource_id"
+    private var _group: Option[String] = None
+    private var _version: Option[Double] = None
+    
+    def plan(version: Double): Plan = plan(None, version)
+    def plan(group: String, version: Double): Plan = plan(Some(group), version)
+    def plan(group: Option[String], version: Double): Plan = {
+		_group = group
+		_version = Some(version)
+        val p = new Plan {
+        	def intent = {
+		        unfiltered.kit.Routes.specify(
+		            FullPath -> dointent _,
+		            FullPath + ("/:%s" format ResourceIdParam) -> dointent _)
+		    }
+        }
+		_postConfigHooks foreach { _() }
+		p
+    }
+    
+    type Hook = Function0[_<:Any]
+    private val _postConfigHooks = collection.mutable.ArrayBuffer[Hook]()
+    protected def postConfig(hook: Hook) = _postConfigHooks += hook
+    
+    def version = _version.get // always defined after config
+    def group = _group // can still be Option after config
+    
+    lazy val FullPath = "/%s%s/%s" format (_group match {
+        case Some(g) => g + "/"
+        case None => ""
+    }, "v"+version, resourcePath)
+    val ResourceIdParam = "resource_id"
 
-    def toJson(obj: Any): String = ResourcePlan toJson obj
-    def fromJson[O](json: String)(implicit mf: Manifest[O]): O = ResourcePlan fromJson json
+    def toJson(obj: Any): String = Resource toJson obj
+    def fromJson[O](json: String)(implicit mf: Manifest[O]): O = Resource fromJson json
 
     private def reject(ctx: Context[T], resp: ErrorResponse): ResponseFunction[Any] = ctx.auth match {
-        //        case Some(_) => Forbidden ~> resp // authenticated but unauthorized
-        //        case _ => WWWAuthenticate(Realm) ~> resp // might need authentication
+        //case Some(_) => Forbidden ~> resp // authenticated but unauthorized
+        //case _ => WWWAuthenticate(Realm) ~> resp // might need authentication
         case _ => Forbidden ~> resp // don't use wwwauthenticate for httpbasic, to avoid popup
     }
 
@@ -66,59 +111,71 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
     def resolve(resourceId: String): Option[R]
 
     type Creator = PartialFunction[Context[T], R => Option[R]]
-    private var _creator: Creator = Map.empty
+    protected var _creator: Creator = Map.empty
     def create(c: Creator) = _creator = c
 
     type RawCreator = PartialFunction[Context[T], String => Option[R]]
-    private var _rawCreator: RawCreator = Map.empty
+    protected var _rawCreator: RawCreator = Map.empty
     def rcreate(c: RawCreator) = _rawCreator = c
 
     type Getter = PartialFunction[Context[T], String => Option[R]]
-    private var _getter: Getter = Map.empty
+    protected var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
 
-    type Querier = PartialFunction[Context[T], QueryParams => Seq[R]]
-    private var _querier: Querier = Map.empty
-    def query(q: Querier) = _querier = q
-
-    type Counter = PartialFunction[Context[T], () => Int]
-    private var _counter: Counter = Map.empty
-    def count(c: Counter) = _counter = c
-
     type Updater = PartialFunction[Context[T], (R, R) => Option[R]]
-    private var _updater: Updater = Map.empty
+    protected var _updater: Updater = Map.empty
     def update(u: Updater) = _updater = u
 
     type Deleter = PartialFunction[Context[T], R => Boolean]
-    private var _deleter: Deleter = Map.empty
+    protected var _deleter: Deleter = Map.empty
     def delete(d: Deleter) = _deleter = d
 
-    // resource converters
+    type Counter = PartialFunction[Context[T], () => Int]
+    protected var _counter: Counter = Map.empty
+    def count(c: Counter) = _counter = c
+
+    type Querier = PartialFunction[Context[T], QueryParams => Seq[R]]
+    protected var _querier: Querier = Map.empty
+    def query(q: Querier) = _querier = q
+
+    // resource converters; by default they will use the from|toJson
+    // helper methods, but they can be overridden for custom handling.
     //
     def deserialize(ctx: Context[T], data: String): R = fromJson(data)
-    def serialize(ctx: Context[T], resource: Any): String = toJson(resource)
-    //def serialize(ctx: Context[T], resources: List[Any]): String = toJson(resources)
+    def serializeGet(ctx: Context[T], resource: R): String = toJson(resource)
+    def serializeQuery(ctx: Context[T], resources: Seq[R]): String = toJson(resources)
+    case class QueryResultGroup[R](val group: Seq[R])
+    def serializeQueryGroup(ctx: Context[T], resources: Seq[QueryResultGroup[R]]): String = toJson(resources)
 
+    // implicit defs that take Context and resource tuples and convert them
+    // into JSON responses using the serialization helpers above.
+    //
     private implicit def resourceToResponse(cr: (Context[T], R)): ResponseFunction[Any] =
-        JsonContent ~> ResponseString(serialize(cr._1, cr._2))
+        JsonContent ~> ResponseString(serializeGet(cr._1, cr._2))
 
     private implicit def resourcesToResponse(cr: (Context[T], Seq[R], Option[Int], Option[Int])): ResponseFunction[Any] = {
-    	case class Group(val group: Seq[Any])
-        val groups = cr._3
-        val groupSize = cr._4
-        var list: Seq[Any] = cr._2
-        list = groups match {
+        val (ctx,results,groups,groupSize) = cr
+        val json = groups match {
             case Some(gCnt) => {
-                val gSize = math.ceil(list.length / gCnt.toDouble).toInt
-                list.grouped(gSize).toSeq.map(Group(_))
+                // group query result by # of requested groups;
+                // must calculate what the group size will be
+                //
+                val gSize = math.ceil(results.length / gCnt.toDouble).toInt
+                val grouped = results.grouped(gSize).toSeq.map(QueryResultGroup(_))
+                serializeQueryGroup(ctx, grouped)
             }
-            case None => list
+            case None => groupSize match {
+            	case Some(gSize) => {
+            	    // group query result by requested group size
+            	    //
+            	    val grouped = results.grouped(gSize).toSeq.map(QueryResultGroup(_))
+            	    serializeQueryGroup(ctx, grouped)
+            	}
+            	// all else fails, simply serialize result seq
+            	case None => serializeQuery(ctx, results)
+            }
         }
-        list = groupSize match {
-            case Some(gSize) => list.grouped(gSize).toSeq.map(Group(_))
-            case None => list
-        }        
-        JsonContent ~> ResponseString(serialize(cr._1, list))
+        JsonContent ~> ResponseString(json)
     }
 
     private implicit def intToResponse(cr: (Context[T], Int)): ResponseFunction[Any] =
@@ -141,12 +198,6 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
         error.status ~> ResponseString(json)
     }
 
-    def intent = {
-        unfiltered.kit.Routes.specify(
-            PathPrefix -> dointent _,
-            PathPrefix + ("/:%s" format ResourceIdParam) -> dointent _)
-    }
-
     private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
         val ctx = Context[T](req, authService.authenticate(req), params)
         req match {
@@ -157,7 +208,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
 
     private def authorize(ctx: Context[T], resourceId: Option[String]): Plan.Intent = resourceId match {
         case Some(rid) => {
-
+                    
             // PUT request must contain JSON
             //
             case req @ PUT(Path(_) & RequestContentType("application/json")) => {
@@ -257,7 +308,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                             object Size extends Params.Extract("size", Params.first ~> Params.int)
                             object GroupCnt extends Params.Extract("groups", Params.first ~> Params.int)
                             object GroupSize extends Params.Extract("groupsize", Params.first ~> Params.int)
-                            
+
                             val groupCnt = req match {
                                 case Params(GroupCnt(gc)) => Some(gc)
                                 case _ => None
@@ -273,7 +324,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                                 // paginate query results accordingly
                                 //
                                 case Params(Page(p) & Size(s)) => {
-                                    val sz = MaxPageSize match {
+                                    val sz = maxPageSize match {
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
@@ -283,7 +334,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                                 // limit query results accordingly
                                 //
                                 case Params(Size(s)) => {
-                                    val sz = MaxPageSize match {
+                                    val sz = maxPageSize match {
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
@@ -293,7 +344,7 @@ abstract class ResourcePlan[T, R](Version: Double, ResourcePath: String, MaxPage
                                 // query results by MaxPageSize value
                                 //
                                 case _ => {
-                                    MaxPageSize match {
+                                    maxPageSize match {
                                         case Some(max) => Ok ~> (ctx, q(QueryParams(None, Some(max))), groupCnt, groupSize)
                                         case None => Ok ~> (ctx, q(QueryParams(None, None)), groupCnt, groupSize)
                                     }
@@ -345,11 +396,6 @@ object ErrDeleteMissingId extends ErrorResponse(NotFound, 4003, "resource id req
 
 class ErrBadMethod(val err: String) extends ErrorResponse(MethodNotAllowed, 9999, err)
 object ErrBadMethod { def apply(method: String) = new ErrBadMethod("%s not supported" format method) }
-
-/**
- * A helper that will JSON serialize BigDecimal
- */
-import net.liftweb.json._
 object BigDecimalSerializer extends Serializer[BigDecimal] {
     private val Class = classOf[BigDecimal]
 

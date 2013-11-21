@@ -3,12 +3,10 @@ package b.uf.api.storage
 import b.storage._
 import b.uf.api._
 
-abstract class StorageResourcePlan[T](
-    Version: Double,
-    ResourcePath: String,
-    MaxPageSize: Option[Int] = None)
-    extends ResourcePlan[T, ObjectMeta[T]](Version, ResourcePath, MaxPageSize) 
+abstract class StorageResource[T](path: String, maxPageSize: Option[Int] = None)
+    extends Resource[T, ObjectMeta[T]](path, maxPageSize) 
     with b.log.Logger {
+
     this: ResourceAuthComponent[T] with StorageComponent[T] =>
 
     def _auth(ctx: Context[T]) = ctx.hasAuth && true
