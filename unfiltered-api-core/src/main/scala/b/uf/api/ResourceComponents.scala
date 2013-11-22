@@ -71,6 +71,19 @@ object Descriptive {
     		Each sub-array will be part of the results array and defined under
     		the results array's item property <code>group</code>.
     	</p>))
+		
+	describeGlobalQuery("grouptranspose", false, Html(
+	    <p>
+    		When set, along with <code>groups</code> or <code>groupsize</code>,
+			the results array will be grouped into sub-arrays accordingly, but
+			transposed.
+    	</p>
+	    <p>
+			For example, usually, if <code>groupsize=3</code>, the first 3 result
+			items would be placed into the first group, whereas if the total result
+			set length was 9 and <code>grouptranspose=1</code>, the first, 4th, and 7th
+			items would be placed into the first group.
+    	</p>))
 }
 
 trait Descriptive[T] {

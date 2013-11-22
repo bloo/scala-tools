@@ -29,13 +29,13 @@ case class QueryParams(page: Option[Int] = None, size: Option[Int])
 
 object Resource {
 
-    def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)
-		(resources: Resource[T,_]*) = {
-		val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
-		    case(res,plan) => res.FullPath }
-		list.reverse.foreach { case(res,plan) => cb.filter(plan) }
-	}
-	
+    def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
+        val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
+            case (res, plan) => res.FullPath
+        }
+        list.reverse.foreach { case (res, plan) => cb.filter(plan) }
+    }
+
     var prettyJson = false
 
     // helper json serializer
@@ -59,42 +59,42 @@ object Resource {
 }
 
 abstract class Resource[T, R](
-        val resourcePath: String,
-        val maxPageSize: Option[Int] = None)
+    val resourcePath: String,
+    val maxPageSize: Option[Int] = None)
     extends b.log.Logger {
-    
+
     this: ResourceAuthComponent[T] =>
 
     private var _group: Option[String] = None
     private var _version: Option[Double] = None
-    
+
     def plan(version: Double): Plan = plan(None, version)
     def plan(group: String, version: Double): Plan = plan(Some(group), version)
     def plan(group: Option[String], version: Double): Plan = {
-		_group = group
-		_version = Some(version)
+        _group = group
+        _version = Some(version)
         val p = new Plan {
-        	def intent = {
-		        unfiltered.kit.Routes.specify(
-		            FullPath -> dointent _,
-		            FullPath + ("/:%s" format ResourceIdParam) -> dointent _)
-		    }
+            def intent = {
+                unfiltered.kit.Routes.specify(
+                    FullPath -> dointent _,
+                    FullPath + ("/:%s" format ResourceIdParam) -> dointent _)
+            }
         }
-		_postConfigHooks foreach { _() }
-		p
+        _postConfigHooks foreach { _() }
+        p
     }
-    
-    type Hook = Function0[_<:Any]
+
+    type Hook = Function0[_ <: Any]
     private val _postConfigHooks = collection.mutable.ArrayBuffer[Hook]()
     protected def postConfig(hook: Hook) = _postConfigHooks += hook
-    
+
     def version = _version.get // always defined after config
     def group = _group // can still be Option after config
-    
+
     lazy val FullPath = "/%s%s/%s" format (_group match {
         case Some(g) => g + "/"
         case None => ""
-    }, "v"+version, resourcePath)
+    }, "v" + version, resourcePath)
     val ResourceIdParam = "resource_id"
 
     def toJson(obj: Any): String = Resource toJson obj
@@ -153,27 +153,52 @@ abstract class Resource[T, R](
     private implicit def resourceToResponse(cr: (Context[T], R)): ResponseFunction[Any] =
         JsonContent ~> ResponseString(serializeGet(cr._1, cr._2))
 
-    private implicit def resourcesToResponse(cr: (Context[T], Seq[R], Option[Int], Option[Int])): ResponseFunction[Any] = {
-        val (ctx,results,groups,groupSize) = cr
-        val json = groups match {
-            case Some(gCnt) => {
-                // group query result by # of requested groups;
-                // must calculate what the group size will be
+    private implicit def resourcesToResponse(cr: (Context[T], Seq[R], Option[Int], Option[Int], Boolean)): ResponseFunction[Any] = {
+        val (ctx, results, groups, groupSize, groupTranspose) = cr
+
+        // calculate group cnt and group size depending on which was defined
+        //
+        val gCntAndSize = (groups, groupSize) match {
+            case (Some(gCnt), _) => Some(gCnt -> math.ceil(results.length / gCnt.toDouble).toInt)
+            case (None, Some(gSize)) => Some(math.ceil(results.length / gSize.toDouble).toInt -> gSize)
+            case _ => None
+        }
+
+        val json = gCntAndSize match {
+            case Some((gCnt, gSize)) => {
+
+                // if transpose is true and gCnt & gSize are defined,
+                // we'll reorder the results list so that the .grouped(Seq)
+                // method gives us the groupings we want
                 //
-                val gSize = math.ceil(results.length / gCnt.toDouble).toInt
-                val grouped = results.grouped(gSize).toSeq.map(QueryResultGroup(_))
+                val groupMe = if (groupTranspose) {
+                    
+                    val transposed = new collection.mutable.ArraySeq[R](results.length)
+                    // this isn't very elegant.. but at least it's O(n)
+                    var start = 0
+                    val end = results.length - 1
+                    var sourceIdx = 0
+                    var destIdx = 0
+                    do {
+                        transposed update (destIdx, results(sourceIdx))
+                        destIdx = destIdx + 1
+                        sourceIdx = sourceIdx + gCnt
+                        if (sourceIdx > end) { start = start + 1; sourceIdx = start }
+                    } while (destIdx <= end)
+                    // 'transposed' now contains the same elements as results, but in
+                    // an order that a call to .grouped will get us the transposed
+                    // grouping that we want
+                    transposed
+                } else results
+
+                // group query result by requested group size
+                //
+                val grouped = groupMe.grouped(gSize).toSeq.map(QueryResultGroup(_))
                 serializeQueryGroup(ctx, grouped)
             }
-            case None => groupSize match {
-            	case Some(gSize) => {
-            	    // group query result by requested group size
-            	    //
-            	    val grouped = results.grouped(gSize).toSeq.map(QueryResultGroup(_))
-            	    serializeQueryGroup(ctx, grouped)
-            	}
-            	// all else fails, simply serialize result seq
-            	case None => serializeQuery(ctx, results)
-            }
+
+            // simply serialize result seq as one ungrouped list
+            case None => serializeQuery(ctx, results)
         }
         JsonContent ~> ResponseString(json)
     }
@@ -208,7 +233,7 @@ abstract class Resource[T, R](
 
     private def authorize(ctx: Context[T], resourceId: Option[String]): Plan.Intent = resourceId match {
         case Some(rid) => {
-                    
+
             // PUT request must contain JSON
             //
             case req @ PUT(Path(_) & RequestContentType("application/json")) => {
@@ -308,6 +333,7 @@ abstract class Resource[T, R](
                             object Size extends Params.Extract("size", Params.first ~> Params.int)
                             object GroupCnt extends Params.Extract("groups", Params.first ~> Params.int)
                             object GroupSize extends Params.Extract("groupsize", Params.first ~> Params.int)
+                            object GroupTrans extends b.uf.params.Flag("grouptranspose")
 
                             val groupCnt = req match {
                                 case Params(GroupCnt(gc)) => Some(gc)
@@ -319,6 +345,11 @@ abstract class Resource[T, R](
                                 case _ => None
                             }
 
+                            val groupTranspose = req match {
+                                case Params(GroupTrans(flag)) => flag
+                                case _ => false
+                            }
+
                             req match {
                                 // page and size present -
                                 // paginate query results accordingly
@@ -328,7 +359,7 @@ abstract class Resource[T, R](
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
-                                    Ok ~> (ctx, q(QueryParams(Some(p), Some(sz))), groupCnt, groupSize)
+                                    Ok ~> (ctx, q(QueryParams(Some(p), Some(sz))), groupCnt, groupSize, groupTranspose)
                                 }
                                 // only size present -
                                 // limit query results accordingly
@@ -338,15 +369,15 @@ abstract class Resource[T, R](
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
-                                    Ok ~> (ctx, q(QueryParams(None, Some(sz))), groupCnt, groupSize)
+                                    Ok ~> (ctx, q(QueryParams(None, Some(sz))), groupCnt, groupSize, groupTranspose)
                                 }
                                 // no pagination params - only limit
                                 // query results by MaxPageSize value
                                 //
                                 case _ => {
                                     maxPageSize match {
-                                        case Some(max) => Ok ~> (ctx, q(QueryParams(None, Some(max))), groupCnt, groupSize)
-                                        case None => Ok ~> (ctx, q(QueryParams(None, None)), groupCnt, groupSize)
+                                        case Some(max) => Ok ~> (ctx, q(QueryParams(None, Some(max))), groupCnt, groupSize, groupTranspose)
+                                        case None => Ok ~> (ctx, q(QueryParams(None, None)), groupCnt, groupSize, groupTranspose)
                                     }
                                 }
                             }
