@@ -60,6 +60,10 @@ object Descriptive {
 	    <p>
     		Each sub-array will be part of the results array and defined under
     		the results array's item property <code>group</code>.
+    	</p>
+	    <p>
+    		If <code>group</code> and <code>groupsize</code> are defined,
+			<code>groupsize</code> is ignored.
     	</p>))
 		
 	describeGlobalQuery("groupsize", false, Html(
@@ -70,6 +74,10 @@ object Descriptive {
 	    <p>
     		Each sub-array will be part of the results array and defined under
     		the results array's item property <code>group</code>.
+    	</p>
+	    <p>
+    		If <code>group</code> and <code>groupsize</code> are defined,
+			<code>groupsize</code> is ignored.
     	</p>))
 		
 	describeGlobalQuery("grouptranspose", false, Html(
