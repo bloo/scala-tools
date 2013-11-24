@@ -25,10 +25,10 @@ import unfiltered.filter.request.ContextPath
 case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String, String]) {
     def hasAuth = !auth.isEmpty
 }
-case class QueryParams(page: Option[Int] = None, size: Option[Int])
+case class PageParams(page: Option[Int] = None, size: Option[Int])
 
 object Resource {
-
+   
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
             case (res, plan) => res.FullPath
@@ -68,6 +68,12 @@ abstract class Resource[T, R](
     private var _group: Option[String] = None
     private var _version: Option[Double] = None
 
+    // helper
+    //
+    implicit def _isNum(id: String) = new { def isNum = id forall Character.isDigit }
+    implicit def _isAlpha(id: String) = new { def isAlpha = id forall Character.isLetter }
+    implicit def _isAlphaNum(id: String) = new { def isAlphaNum = id forall Character.isLetterOrDigit }
+    
     def plan(version: Double): Plan = plan(None, version)
     def plan(group: String, version: Double): Plan = plan(Some(group), version)
     def plan(group: Option[String], version: Double): Plan = {
@@ -108,7 +114,8 @@ abstract class Resource[T, R](
 
     // subclass needs to implement resource resolver
     //
-    def resolve(resourceId: String): Option[R]
+    type Resolver = PartialFunction[(Context[T],String), Option[R]]
+    def resolve: Resolver
 
     type Creator = PartialFunction[Context[T], R => Option[R]]
     protected var _creator: Creator = Map.empty
@@ -118,7 +125,7 @@ abstract class Resource[T, R](
     protected var _rawCreator: RawCreator = Map.empty
     def rcreate(c: RawCreator) = _rawCreator = c
 
-    type Getter = PartialFunction[Context[T], String => Option[R]]
+    type Getter = PartialFunction[Context[T], R => Option[R]]
     protected var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
 
@@ -134,7 +141,7 @@ abstract class Resource[T, R](
     protected var _counter: Counter = Map.empty
     def count(c: Counter) = _counter = c
 
-    type Querier = PartialFunction[Context[T], QueryParams => Seq[R]]
+    type Querier = PartialFunction[Context[T], PageParams => Seq[R]]
     protected var _querier: Querier = Map.empty
     def query(q: Querier) = _querier = q
 
@@ -239,7 +246,7 @@ abstract class Resource[T, R](
             case req @ PUT(Path(_) & RequestContentType("application/json")) => {
                 _updater lift ctx match {
                     case None => reject(ctx, ErrPutUnauthorized)
-                    case Some(u) => resolve(rid) match {
+                    case Some(u) => resolve(ctx,rid) match {
                         case None => ErrPutCannotResolveId
                         case Some(resolved) => u(resolved, deserialize(ctx, req)) match {
                             case Some(updated) => Ok ~> (ctx, updated)
@@ -254,11 +261,12 @@ abstract class Resource[T, R](
             case req @ GET(Path(_)) => {
                 _getter lift ctx match {
                     case None => reject(ctx, ErrGetUnauthorized)
-                    case Some(g) => {
-                        g(rid) match {
+                    case Some(g) => resolve(ctx,rid) match {
+                        case Some(resolved) => g(resolved) match {
                             case None => ErrGetCannotResolveId
                             case Some(found) => Ok ~> (ctx, found)
                         }
+                        case None => ErrGetCannotResolveId
                     }
                 }
             }
@@ -268,7 +276,7 @@ abstract class Resource[T, R](
             case req @ DELETE(Path(_)) => {
                 _deleter lift ctx match {
                     case None => reject(ctx, ErrDeleteUnauthorized)
-                    case Some(d) => resolve(rid) match {
+                    case Some(d) => resolve(ctx,rid) match {
                         case None => ErrDeleteCannotResolveId
                         case Some(resolved) =>
                             if (d(resolved)) Ok else ErrDeleteCannotDelete
@@ -359,7 +367,7 @@ abstract class Resource[T, R](
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
-                                    Ok ~> (ctx, q(QueryParams(Some(p), Some(sz))), groupCnt, groupSize, groupTranspose)
+                                    Ok ~> (ctx, q(PageParams(Some(p), Some(sz))), groupCnt, groupSize, groupTranspose)
                                 }
                                 // only size present -
                                 // limit query results accordingly
@@ -369,15 +377,15 @@ abstract class Resource[T, R](
                                         case Some(max) => if (max > s) s else max
                                         case None => s
                                     }
-                                    Ok ~> (ctx, q(QueryParams(None, Some(sz))), groupCnt, groupSize, groupTranspose)
+                                    Ok ~> (ctx, q(PageParams(None, Some(sz))), groupCnt, groupSize, groupTranspose)
                                 }
                                 // no pagination params - only limit
                                 // query results by MaxPageSize value
                                 //
                                 case _ => {
                                     maxPageSize match {
-                                        case Some(max) => Ok ~> (ctx, q(QueryParams(None, Some(max))), groupCnt, groupSize, groupTranspose)
-                                        case None => Ok ~> (ctx, q(QueryParams(None, None)), groupCnt, groupSize, groupTranspose)
+                                        case Some(max) => Ok ~> (ctx, q(PageParams(None, Some(max))), groupCnt, groupSize, groupTranspose)
+                                        case None => Ok ~> (ctx, q(PageParams(None, None)), groupCnt, groupSize, groupTranspose)
                                     }
                                 }
                             }

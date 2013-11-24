@@ -25,12 +25,14 @@ class ResourceDescriptionsResource[T]
 	with Descriptive[T] {
     this: ResourceAuthComponent[T] =>
     
-    override def resolve(path: String) = None
+    override def resolve = {
+        case (ctx,path) => Descriptive.plans[T].get(path) match {
+        	case Some(plan) => Some(plan.describe(ctx))
+        	case None => None
+        }
+    }
     
-    get { case (ctx) => path => Descriptive.plans[T].get(path) match {
-        case Some(plan) => Some(plan.describe(ctx))
-        case None => None
-    }}
+    get { case (ctx) => Some(_) }
     
     describe(Html(
         <p>

@@ -35,18 +35,21 @@ package object slick {
     abstract class DBTable[T](tag: Tag, tableName: String)
         extends Table[T](tag: Tag, DB.component.entityName(tableName)) {}
 
-    // implicit converter that wraps a Query in a QueryPager
-    // that can list its results using pagination params
+    // implicit converters that wrap CompiledExcetuable or Query instances within a QueryPager
+    // that will then list its results using pagination params via .paginate(PagerParams, QQ=>O)
     //
-    implicit def query_2_queryPager[QQ, R](q: Query[QQ, _ <: R]) = new QueryPager(q)
-
+    implicit def query_2_queryPager[QQ, R](q: Query[QQ, _<:R]) = new QueryPager(q)
+    import scala.slick.lifted.{CompiledExecutable=>CE}
+    implicit def compiled_2_queryPager[QQ, R](c: CE[Query[QQ,_<:R],_]) = new QueryPager(c.extract)
+    
     object QueryPager {
-        case class PagerParams(page: Option[Int], size: Option[Int])
+        case class Page(page: Option[Int], size: Option[Int])
     }
+    type Page = QueryPager.Page
 
     import simple.{ Query, queryToAppliedQueryInvoker }
     class QueryPager[QQ, R](q: Query[QQ, _ <: R]) extends b.log.Logger {
-        def paginate[O <% scala.slick.lifted.Ordered](pp: QueryPager.PagerParams, sorter: QQ=>O)(implicit s: Session): List[R] = paginate(pp.page, pp.size, sorter)
+        def paginate[O <% scala.slick.lifted.Ordered](pp: Page, sorter: QQ=>O)(implicit s: Session): List[R] = paginate(pp.page, pp.size, sorter)
         def paginate[O <% scala.slick.lifted.Ordered](page: Option[Int], size: Option[Int], sorter: QQ=>O)(implicit s: Session) = {
             val sorted = q sortBy sorter
             val pq = (size match {
@@ -56,22 +59,11 @@ package object slick {
                 }
                 case None => sorted
             })
-            logger.info(pq.selectStatement)
+            val c = Compiled { q }
+            val qq = c.list
 //            if (logger.isDebugEnabled)
-//                logger.dbug(pq.selectStatement)
+//                logger.debug(pq.selectStatement)
             pq.list
         }
     }
-
-//    import DB.component.driver.profile.simple.slickDriver.AppliedQuery
-//    class AppliedQueryPager[QQ, R](q: AppliedQuery[QQ]) {
-//        def paginate(pp: QueryPager.PagerParams)(implicit s: Session): List[R] = paginate(pp.page, pp.size)
-//        def paginate(page: Option[Int], size: Option[Int])(implicit s: Session) = {
-//            (size match {
-//                // https://github.com/slick/slick/issues/102
-//                case Some(sz) => q.drop(sz * (page.getOrElse(1) - 1)).take(sz)
-//                case None => q
-//            }).list
-//        }
-//    }
 }

@@ -16,8 +16,10 @@ class SessionsResource[T, S](path: String = "sessions")
 
     // find our user's session, ignore 'id', as it's "local"
     //
-    def resolve(id: String): Option[S] =
-        if ("local" == id) sessionService.local else sessionService get id
+    override def resolve = {
+        case (_,id) if ("local" == id) => sessionService.local
+        case (_,id) => sessionService get id
+    }
 
     object Remember extends b.uf.params.Flag("remember")
     
@@ -40,8 +42,7 @@ class SessionsResource[T, S](path: String = "sessions")
     }
 
     get {
-        // allow get, simply call resolve
-        case (ctx) if ctx hasAuth => resolve _
+        case (ctx) if ctx hasAuth => Some(_)
     }
 
     delete {

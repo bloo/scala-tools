@@ -16,7 +16,9 @@ abstract class StorageResource[T](path: String, maxPageSize: Option[Int] = None)
     import unfiltered.request.Params
     object Name extends Params.Extract("name", Params.first ~> Params.nonempty)
 
-    def resolve(id: String) = storageService.find(id)
+    def resolve = {
+        case (_,id) => storageService.find(id)
+    }
     
     rcreate {
         case (ctx) if _auth(ctx) => { _ =>
@@ -28,7 +30,7 @@ abstract class StorageResource[T](path: String, maxPageSize: Option[Int] = None)
     }
 
     get {
-        case (ctx) if _auth(ctx) => { resolve _ }
+        case (ctx) if _auth(ctx) => Some(_)
     }
 
     delete {
