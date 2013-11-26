@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/bloo/scala-tools.png?label=ready)](https://waffle.io/bloo/scala-tools)  
 
 scala tools..
 
