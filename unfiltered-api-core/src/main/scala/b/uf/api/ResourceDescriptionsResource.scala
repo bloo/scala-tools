@@ -14,6 +14,7 @@ case class SupportedOp(
         val params: Seq[ParamDescriptor])
         
 case class ResourceDescriptor(
+        val id: String,
         val path: String,
         val version: Double,
         val maxPageSize: Option[Int],
@@ -26,7 +27,7 @@ class ResourceDescriptionsResource[T]
     this: ResourceAuthComponent[T] =>
     
     override def resolve = {
-        case (ctx,path) => Descriptive.plans[T].get(path) match {
+        case (ctx,id) => Descriptive.plans[T].get(id) match {
         	case Some(plan) => Some(plan.describe(ctx))
         	case None => None
         }

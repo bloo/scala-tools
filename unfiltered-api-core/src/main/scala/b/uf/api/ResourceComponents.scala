@@ -100,7 +100,7 @@ trait Descriptive[T] {
     // register self post-config
     //
     postConfig { () =>
-    	Descriptive.planMap.put(FullPath, this)
+    	Descriptive.planMap.put(pathToId(FullPath), this)
     }
 
     def describe(ctx: Context[T]) = {        
@@ -122,8 +122,10 @@ trait Descriptive[T] {
             case Some(h) => Some(_htmlToStr(h))
             case None => None
         }
-        ResourceDescriptor(FullPath, version, maxPageSize, desc, ms.toSeq)
+        ResourceDescriptor(pathToId(FullPath), FullPath, version, maxPageSize, desc, ms.toSeq)
     }
+    
+    def pathToId(path: String) = path.replaceAll("^/+", "").replaceAll("/", "_")
     
     // allow base classes to register documentation
     //

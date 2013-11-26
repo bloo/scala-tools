@@ -1,6 +1,8 @@
 
 scala tools..
 
+[![Stories in Ready](https://badge.waffle.io/bloo/scala-tools.png?label=ready)](http://waffle.io/bloo/scala-tools)
+
 __slick__
 
 tbd
