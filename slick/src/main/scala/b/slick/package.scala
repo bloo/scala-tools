@@ -39,8 +39,9 @@ package object slick {
     // that will then list its results using pagination params via .paginate(PagerParams, QQ=>O)
     //
     implicit def query_2_queryPager[QQ, R](q: Query[QQ, _<:R]) = new QueryPager(q)
-    import scala.slick.lifted.{CompiledExecutable=>CE}
-    implicit def compiled_2_queryPager[QQ, R](c: CE[Query[QQ,_<:R],_]) = new QueryPager(c.extract)
+    import scala.slick.lifted.{CompiledExecutable=>CE,AppliedCompiledFunction=>ACF}
+//    implicit def compiled_2_queryPager[QQ, R](c: CE[Query[QQ,_<:R],_]) = new QueryPager(c.extract)
+//    implicit def compiledf_2_queryPager[QQ, R](c: ACF[_,Query[_,_<:R],_]) = new QueryPager(c.extract)
     
     object QueryPager {
         case class Page(page: Option[Int], size: Option[Int])
@@ -59,8 +60,6 @@ package object slick {
                 }
                 case None => sorted
             })
-            val c = Compiled { q }
-            val qq = c.list
 //            if (logger.isDebugEnabled)
 //                logger.debug(pq.selectStatement)
             pq.list

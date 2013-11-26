@@ -28,7 +28,7 @@ case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String,
 case class PageParams(page: Option[Int] = None, size: Option[Int])
 
 object Resource {
-   
+
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
             case (res, plan) => res.FullPath
@@ -46,6 +46,12 @@ object Resource {
         implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
         val doc = render(decompose(obj))
         if (!prettyJson) pretty(doc) else compact(doc)
+    }
+
+    def toXml(rootName: String, obj: Any): String = {
+        implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
+        val doc = decompose(obj)
+        Xml toXml(doc) toString
     }
 
     // helper json deserializer
@@ -73,7 +79,7 @@ abstract class Resource[T, R](
     implicit def _isNum(id: String) = new { def isNum = id forall Character.isDigit }
     implicit def _isAlpha(id: String) = new { def isAlpha = id forall Character.isLetter }
     implicit def _isAlphaNum(id: String) = new { def isAlphaNum = id forall Character.isLetterOrDigit }
-    
+
     def plan(version: Double): Plan = plan(None, version)
     def plan(group: String, version: Double): Plan = plan(Some(group), version)
     def plan(group: Option[String], version: Double): Plan = {
@@ -104,6 +110,7 @@ abstract class Resource[T, R](
     val ResourceIdParam = "resource_id"
 
     def toJson(obj: Any): String = Resource toJson obj
+    def toXml(obj: Any): String = Resource toXml(resourcePath, obj)
     def fromJson[O](json: String)(implicit mf: Manifest[O]): O = Resource fromJson json
 
     private def reject(ctx: Context[T], resp: ErrorResponse): ResponseFunction[Any] = ctx.auth match {
@@ -114,7 +121,7 @@ abstract class Resource[T, R](
 
     // subclass needs to implement resource resolver
     //
-    type Resolver = PartialFunction[(Context[T],String), Option[R]]
+    type Resolver = PartialFunction[(Context[T], String), Option[R]]
     def resolve: Resolver
 
     type Creator = PartialFunction[Context[T], R => Option[R]]
@@ -149,10 +156,27 @@ abstract class Resource[T, R](
     // helper methods, but they can be overridden for custom handling.
     //
     def deserialize(ctx: Context[T], data: String): R = fromJson(data)
-    def serializeGet(ctx: Context[T], resource: R): String = toJson(resource)
-    def serializeQuery(ctx: Context[T], resources: Seq[R]): String = toJson(resources)
+
+    def serializeGet(ctx: Context[T], resource: R): String = ctx.req match {
+        case Accepts.Json(_) => toJson(resource)
+        case Accepts.Xml(_) => toXml(resource)
+    }
+
+    def serializeCount(ctx: Context[T], cnt: CountResult): String = ctx.req match {
+        case Accepts.Json(_) => toJson(cnt)
+        case Accepts.Xml(_) => toXml(cnt)
+    }
+
+    def serializeQuery(ctx: Context[T], resources: Seq[R]): String = ctx.req match {
+        case Accepts.Json(_) => toJson(resources)
+        case Accepts.Xml(_) => toXml(resources)
+    }
+
     case class QueryResultGroup[R](val group: Seq[R])
-    def serializeQueryGroup(ctx: Context[T], resources: Seq[QueryResultGroup[R]]): String = toJson(resources)
+    def serializeQueryGroup(ctx: Context[T], resources: Seq[QueryResultGroup[R]]): String = ctx.req match {
+        case Accepts.Json(_) => toJson(resources)
+        case Accepts.Xml(_) => toXml(resources)
+    }
 
     // implicit defs that take Context and resource tuples and convert them
     // into JSON responses using the serialization helpers above.
@@ -179,7 +203,7 @@ abstract class Resource[T, R](
                 // method gives us the groupings we want
                 //
                 val groupMe = if (groupTranspose) {
-                    
+
                     val transposed = new collection.mutable.ArraySeq[R](results.length)
                     // this isn't very elegant.. but at least it's O(n)
                     var start = 0
@@ -210,8 +234,10 @@ abstract class Resource[T, R](
         JsonContent ~> ResponseString(json)
     }
 
+
+    case class CountResult(val count: Int)
     private implicit def intToResponse(cr: (Context[T], Int)): ResponseFunction[Any] =
-        JsonContent ~> ResponseString("""{"count": %d}""" format cr._2)
+        JsonContent ~> ResponseString( serializeCount(cr._1, CountResult(cr._2)) )
 
     private implicit def reqToResource[X](req: HttpRequest[X]): String = {
         val in = req inputStream
@@ -233,8 +259,8 @@ abstract class Resource[T, R](
     private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
         val ctx = Context[T](req, authService.authenticate(req), params)
         req match {
-            case Accepts.Json(_) => authorize(ctx, params.get(ResourceIdParam))(req)
-            case _ => NotAcceptable ~> ResponseString("You must accept application/json")
+            case Accepts.Json(_) | Accepts.Xml(_) => authorize(ctx, params.get(ResourceIdParam))(req)
+            case _ => NotAcceptable ~> ResponseString("You must accept application/json or application/xml")
         }
     }
 
@@ -246,7 +272,7 @@ abstract class Resource[T, R](
             case req @ PUT(Path(_) & RequestContentType("application/json")) => {
                 _updater lift ctx match {
                     case None => reject(ctx, ErrPutUnauthorized)
-                    case Some(u) => resolve(ctx,rid) match {
+                    case Some(u) => resolve(ctx, rid) match {
                         case None => ErrPutCannotResolveId
                         case Some(resolved) => u(resolved, deserialize(ctx, req)) match {
                             case Some(updated) => Ok ~> (ctx, updated)
@@ -261,7 +287,7 @@ abstract class Resource[T, R](
             case req @ GET(Path(_)) => {
                 _getter lift ctx match {
                     case None => reject(ctx, ErrGetUnauthorized)
-                    case Some(g) => resolve(ctx,rid) match {
+                    case Some(g) => resolve(ctx, rid) match {
                         case Some(resolved) => g(resolved) match {
                             case None => ErrGetCannotResolveId
                             case Some(found) => Ok ~> (ctx, found)
@@ -276,7 +302,7 @@ abstract class Resource[T, R](
             case req @ DELETE(Path(_)) => {
                 _deleter lift ctx match {
                     case None => reject(ctx, ErrDeleteUnauthorized)
-                    case Some(d) => resolve(ctx,rid) match {
+                    case Some(d) => resolve(ctx, rid) match {
                         case None => ErrDeleteCannotResolveId
                         case Some(resolved) =>
                             if (d(resolved)) Ok else ErrDeleteCannotDelete
