@@ -26,9 +26,31 @@ case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String,
     def hasAuth = !auth.isEmpty
 }
 case class PageParams(page: Option[Int] = None, size: Option[Int])
+case class CountResult(val count: Int)
+case class ResourceErrorJson(val code: Int, val messages: Seq[String])
+case class QueryResultGroup[R](val group: Seq[R])
+
+trait ResourceSerializer[T,R] {
+    def ser: PartialFunction[Context[T], Either[R=>String,ResourceErrorJson]]
+}
+
+trait ResourceCountSerializer[T] {
+    def ser: PartialFunction[Context[T], Either[CountResult=>String,ResourceErrorJson]]
+}
+
+trait ResourceQuerySerializer[T,R] {
+    def ser: PartialFunction[Context[T], Either[Seq[R]=>String,ResourceErrorJson]]
+    def serGroup: PartialFunction[Context[T], Either[QueryResultGroup[R]=>String,ResourceErrorJson]]
+}
+
+trait ResourceDeserializer[T,R] {
+    def deser: PartialFunction[Context[T], Either[(String,Manifest[R])=>R,ResourceErrorJson]]
+}
 
 object Resource {
 
+    private val foo = ""
+        
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
             case (res, plan) => res.FullPath
@@ -51,7 +73,7 @@ object Resource {
     def toXml(rootName: String, obj: Any): String = {
         implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
         val doc = decompose(obj)
-        Xml toXml(doc) toString
+        Xml toXml (doc) toString
     }
 
     // helper json deserializer
@@ -62,12 +84,65 @@ object Resource {
         implicit val formats = DefaultFormats + BigDecimalSerializer // Brings in default date formats etc.
         extract[O](parse(json))
     }
+
+    private trait LowPriorityResourceImplicits[T,R] {
+
+        implicit def serResourceToJsonOrXml: ResourceSerializer[T,R] = 
+            new ResourceSerializer[T,R] with JsonOrXml[R] {
+	    	def ser = _.req match {
+	    	    case Accepts.Json(_) => Left(_toJson)
+	    	    case Accepts.Xml(_) => Left(_toXml)
+	    	    case _ => Right(ResourceErrorJson(0,Seq()))
+	    	}
+	    }
+		
+		implicit def serResourcesToJsonOrXml: ResourceQuerySerializer[T,R] =
+		    new ResourceQuerySerializer[T,R] with JsonOrXml[R] {
+	    	def ser = _.req match {
+	    	    case Accepts.Json(_) => Left(_toJson)
+	    	    case Accepts.Xml(_) => Left(_toXml)
+	    	    case _ => Right(ResourceErrorJson(0,Seq()))
+	    	}
+	    	def serGroup = _.req match {
+	    	    case Accepts.Json(_) => Left(_toJson)
+	    	    case Accepts.Xml(_) => Left(_toXml)
+	    	    case _ => Right(ResourceErrorJson(0,Seq()))
+	    	}
+	    }
+		
+	    implicit def deserFromJson: ResourceDeserializer[T,R] =
+	        new ResourceDeserializer[T,R] with JsonOrXml[R] {
+	    	def deser = _.req match {
+	    	    case RequestContentType("application/json") => Left(_fromJson(_)(_))
+	    	    case _ => Right(ResourceErrorJson(0,Seq()))
+	    	}	    	
+	    }
+		
+	    trait JsonOrXml[R] {
+	        import net.liftweb.json._
+	        import net.liftweb.json.Extraction._
+	        // brings in default date formats etc.
+	        implicit val formats = DefaultFormats + BigDecimalSerializer
+	        protected def _toJson(obj: Any): String = {
+		        val doc = render(decompose(obj))
+		        //if (!prettyJson) pretty(doc) else compact(doc)  
+		        compact(doc)
+	        }
+	        protected def _toXml(obj: Any): String = {
+		        val doc = decompose(obj)
+		        Xml toXml (doc) toString
+	        }
+	        protected def _fromJson(data: String)(implicit mf: Manifest[R]): R = {
+	            extract[R](parse(data))
+	        }
+	    }	    
+	}    
 }
 
 abstract class Resource[T, R](
     val resourcePath: String,
     val maxPageSize: Option[Int] = None)
-    extends b.log.Logger {
+    extends b.log.Logger {//with Resource.LowPriorityResourceImplicits[R] {
 
     this: ResourceAuthComponent[T] =>
 
@@ -110,7 +185,7 @@ abstract class Resource[T, R](
     val ResourceIdParam = "resource_id"
 
     def toJson(obj: Any): String = Resource toJson obj
-    def toXml(obj: Any): String = Resource toXml(resourcePath, obj)
+    def toXml(obj: Any): String = Resource toXml (resourcePath, obj)
     def fromJson[O](json: String)(implicit mf: Manifest[O]): O = Resource fromJson json
 
     private def reject(ctx: Context[T], resp: ErrorResponse): ResponseFunction[Any] = ctx.auth match {
@@ -131,26 +206,48 @@ abstract class Resource[T, R](
     type RawCreator = PartialFunction[Context[T], String => Option[R]]
     protected var _rawCreator: RawCreator = Map.empty
     def rcreate(c: RawCreator) = _rawCreator = c
+//    def rcreate(c: RawCreator)(implicit ds: ResourceDeserializer[T], s: ResourceSerializer[T]) = _rawCreator = c
 
     type Getter = PartialFunction[Context[T], R => Option[R]]
     protected var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
+//    protected var _getterDeser: ResourceDeserializer[R] = null
+//    protected var _getterSer: ResourceSerializer[R] = null
+//    def get(g: Getter)(implicit ds: ResourceDeserializer[R], s: ResourceSerializer[R]) = {
+//        _getter = g
+//        _getterDeser = ds
+//        _getterSer = s
+//    }
 
     type Updater = PartialFunction[Context[T], (R, R) => Option[R]]
     protected var _updater: Updater = Map.empty
     def update(u: Updater) = _updater = u
+//    protected var _updaterDeser: ResourceDeserializer[R] = null
+//    protected var _updaterSer: ResourceSerializer[R] = null
+//    protected var _updater: Updater = Map.empty
+//    def update(u: Updater)(implicit ds: ResourceDeserializer[R], s: ResourceSerializer[R]) = {
+//        _updater = u
+//        _updaterDeser = ds
+//        _updaterSer = s
+//    }
 
     type Deleter = PartialFunction[Context[T], R => Boolean]
     protected var _deleter: Deleter = Map.empty
     def delete(d: Deleter) = _deleter = d
+//    def delete(d: Deleter)(implicit ds: ResourceDeserializer[R]) = { _deleter = d; _deleterDeser = ds }
+//    protected var _deleterDeser: ResourceDeserializer[R] = null
 
     type Counter = PartialFunction[Context[T], () => Int]
     protected var _counter: Counter = Map.empty
     def count(c: Counter) = _counter = c
+//    def count(c: Counter)(implicit s: ResourceCountSerializer) = { _counter = c; _counterSer = s }
+//    protected var _counterSer: ResourceCountSerializer = null
 
     type Querier = PartialFunction[Context[T], PageParams => Seq[R]]
     protected var _querier: Querier = Map.empty
     def query(q: Querier) = _querier = q
+//    def query(q: Querier)(implicit s: ResourceQuerySerializer[R]) = { _querier = q; _querierSer = s }
+//    protected var _querierSer: ResourceQuerySerializer[R] = null
 
     // resource converters; by default they will use the from|toJson
     // helper methods, but they can be overridden for custom handling.
@@ -172,7 +269,6 @@ abstract class Resource[T, R](
         case Accepts.Xml(_) => toXml(resources)
     }
 
-    case class QueryResultGroup[R](val group: Seq[R])
     def serializeQueryGroup(ctx: Context[T], resources: Seq[QueryResultGroup[R]]): String = ctx.req match {
         case Accepts.Json(_) => toJson(resources)
         case Accepts.Xml(_) => toXml(resources)
@@ -234,10 +330,8 @@ abstract class Resource[T, R](
         JsonContent ~> ResponseString(json)
     }
 
-
-    case class CountResult(val count: Int)
     private implicit def intToResponse(cr: (Context[T], Int)): ResponseFunction[Any] =
-        JsonContent ~> ResponseString( serializeCount(cr._1, CountResult(cr._2)) )
+        JsonContent ~> ResponseString(serializeCount(cr._1, CountResult(cr._2)))
 
     private implicit def reqToResource[X](req: HttpRequest[X]): String = {
         val in = req inputStream
@@ -249,7 +343,6 @@ abstract class Resource[T, R](
         resp
     }
 
-    case class ResourceErrorJson(val code: Int, val messages: Seq[String])
     private implicit def errorToJson(error: ErrorResponse): ResponseFunction[Any] = {
         val re = ResourceErrorJson(error.code, error.messages)
         val json = toJson(re)

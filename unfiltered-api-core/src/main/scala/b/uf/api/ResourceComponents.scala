@@ -19,13 +19,10 @@ object Descriptive {
 
     private val globalQueryParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     
-    private def describeGlobalQuery(paramName: String, required: Boolean, desc: =>Html) =
-        globalQueryParams += ParamDescriptor(paramName, Some(htmlToStr(desc)), required)
+    private def describeGlobalQuery(paramName: String, required: Boolean, desc: xml.NodeSeq) =
+        globalQueryParams += ParamDescriptor(paramName, Some(desc.toString), required)
     
-    private def htmlToStr(h: Html) = h.toString.replaceAll("^Html\\(", "")
-    	.replaceAll("\\)$", "").replaceAll("\\\n", "").replaceAll("\\\t", "")
-    
-	describeGlobalQuery("count", false, Html(
+	describeGlobalQuery("count", false,
 	    <p>
     		When set to <code>1</code> or <code>true</code>, this causes
     		the resource service to return a single counter object of the format:
@@ -35,23 +32,23 @@ object Descriptive {
     		where N is an integer representing the total number of results that
     		would be returned from the query (not taking into consideration the
     		<code>page</code> and <code>size</code> pagination parameters).
-    	</p>))
+    	</p>)
 
-	describeGlobalQuery("size", false, Html(
+	describeGlobalQuery("size", false,
 	    <p>
     		When set to an integer > 0, the results will be limited to this value.
-    	</p>))
+    	</p>)
 		
-	describeGlobalQuery("page", false, Html(
+	describeGlobalQuery("page", false,
 	    <p>
     		When <code>size</code> has also been set, this value will be used to
     		determine which offset to apply to the query results. For example, with
     		<code>size=5</code> and <code>page=3</code>, the first <code>15</code>
     		results will be skipped, and the <code>16th</code> item will be the
     		first item in the results array.
-    	</p>))
+    	</p>)
 		
-	describeGlobalQuery("groups", false, Html(
+	describeGlobalQuery("groups", false,
 	    <p>
     		When set, the results array will be grouped into sub-arrays of equal (or
     		as equal as possible) length. The value of this parameter determines how
@@ -64,9 +61,9 @@ object Descriptive {
 	    <p>
     		If <code>group</code> and <code>groupsize</code> are defined,
 			<code>groupsize</code> is ignored.
-    	</p>))
+    	</p>)
 		
-	describeGlobalQuery("groupsize", false, Html(
+	describeGlobalQuery("groupsize", false,
 	    <p>
     		When set, the results array will be grouped into sub-arrays where their
     		lengths will be the size of this parameter's value.
@@ -78,9 +75,9 @@ object Descriptive {
 	    <p>
     		If <code>group</code> and <code>groupsize</code> are defined,
 			<code>groupsize</code> is ignored.
-    	</p>))
+    	</p>)
 		
-	describeGlobalQuery("grouptranspose", false, Html(
+	describeGlobalQuery("grouptranspose", false,
 	    <p>
     		When set, along with <code>groups</code> or <code>groupsize</code>,
 			the results array will be grouped into sub-arrays accordingly, but
@@ -91,12 +88,12 @@ object Descriptive {
 			items would be placed into the first group, whereas if the total result
 			set length was 9 and <code>grouptranspose=1</code>, the first, 4th, and 7th
 			items would be placed into the first group.
-    	</p>))
+    	</p>)
 }
 
 trait Descriptive[T] {
     this: Resource[T,_] with ResourceAuthComponent[T] =>
-        
+    
     // register self post-config
     //
     postConfig { () =>
@@ -106,20 +103,20 @@ trait Descriptive[T] {
     def describe(ctx: Context[T]) = {        
         
         val ms = collection.mutable.ArrayBuffer[SupportedOp]()
-        if (_getter.isDefinedAt(ctx))
+        if (_getter isDefinedAt ctx)
             ms += SupportedOp("get", "GET", FullPath + "/:" + ResourceIdParam, _getterParams)
-        if (_querier.isDefinedAt(ctx))
+        if (_querier isDefinedAt ctx)
             ms += SupportedOp("query", "GET", FullPath, _querierParams ++ Descriptive.globalQueryParams)
-        if (_creator.isDefinedAt(ctx))
+        if (_creator isDefinedAt ctx)
             ms += SupportedOp("create", "POST", FullPath + " (with JSON in the request body)", _creatorParams)
-        if (_rawCreator.isDefinedAt(ctx))
+        if (_rawCreator isDefinedAt ctx)
             ms += SupportedOp("rawCreate", "POST", FullPath + " (with custom request body and/or params required)", _rawCreatorParams)
-        if (_updater.isDefinedAt(ctx))
+        if (_updater isDefinedAt ctx)
             ms += SupportedOp("update", "PUT", FullPath + "/:" + ResourceIdParam + " (with JSON in the request body)", _updaterParams)
-        if (_deleter.isDefinedAt(ctx))
+        if (_deleter isDefinedAt ctx)
             ms += SupportedOp("delete", "DELETE", FullPath + "/:" + ResourceIdParam, _deleterParams)
         val desc = _description match {
-            case Some(h) => Some(_htmlToStr(h))
+            case Some(h) => Some(h.toString)
             case None => None
         }
         ResourceDescriptor(pathToId(FullPath), FullPath, version, maxPageSize, desc, ms.toSeq)
@@ -127,11 +124,7 @@ trait Descriptive[T] {
     
     def pathToId(path: String) = path.replaceAll("^/+", "").replaceAll("/", "_")
     
-    // allow base classes to register documentation
-    //
-    private def _htmlToStr(h: Html) = Descriptive.htmlToStr(h)
-    
-    private var _description: Option[Html] = None
+    private var _description: Option[xml.Elem] = None
     private val _getterParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _querierParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _creatorParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
@@ -139,17 +132,56 @@ trait Descriptive[T] {
     private val _updaterParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _deleterParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     
-    def describe(desc: Html) = _description = Some(desc)    
-    def describeQuery(paramName: String, required: Boolean, desc: =>Html) =
-        _querierParams += ParamDescriptor(paramName, Some(_htmlToStr(desc)), required)
-    def describeCreate(paramName: String, required: Boolean, desc: =>Html) =
-        _creatorParams += ParamDescriptor(paramName, Some(_htmlToStr(desc)), required)
-    def describeRawCreate(paramName: String, required: Boolean, desc: =>Html) =
-        _rawCreatorParams += ParamDescriptor(paramName, Some(_htmlToStr(desc)), required)
-    def describeUpdate(paramName: String, required: Boolean, desc: =>Html) =
-        _updaterParams += ParamDescriptor(paramName, Some(_htmlToStr(desc)), required)
-    def describeGet(paramName: String, required: Boolean, desc: =>Html) =
-        _getterParams += ParamDescriptor(paramName, Some(_htmlToStr(desc)), required)
-    def describeDelete(paramName: String, required: Boolean, desc: =>Html) =
-        _deleterParams += ParamDescriptor(paramName, Some(_htmlToStr(desc)), required)
+    def describe(desc: xml.Elem) = _description = Some(desc)    
+    
+    private def describeQuery(paramName: String, required: Boolean, desc: xml.Elem) =
+        _querierParams += ParamDescriptor(paramName, Some(desc.toString), required)
+    private def describeCreate(paramName: String, required: Boolean, desc: xml.Elem) =
+        _creatorParams += ParamDescriptor(paramName, Some(desc.toString), required)
+    private def describeRawCreate(paramName: String, required: Boolean, desc: xml.Elem) =
+        _rawCreatorParams += ParamDescriptor(paramName, Some(desc.toString), required)
+    private def describeUpdate(paramName: String, required: Boolean, desc: xml.Elem) =
+        _updaterParams += ParamDescriptor(paramName, Some(desc.toString), required)
+    private def describeGet(paramName: String, required: Boolean, desc: xml.Elem) =
+        _getterParams += ParamDescriptor(paramName, Some(desc.toString), required)
+    private def describeDelete(paramName: String, required: Boolean, desc: xml.Elem) =
+        _deleterParams += ParamDescriptor(paramName, Some(desc.toString), required)
+        
+        
+    trait DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+    	def describe: (String, Boolean, xml.Elem)
+        protected val d = describe
+    }
+
+    trait DescribesQuery extends DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+        describeQuery(d._1, d._2, d._3)
+    }
+
+    trait DescribesCreate extends DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+        describeCreate(d._1, d._2, d._3)
+    }
+
+    trait DescribesRawCreate extends DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+        describeRawCreate(d._1, d._2, d._3)
+    }
+
+    trait DescribesUpdate extends DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+        describeUpdate(d._1, d._2, d._3)
+    }
+    
+    trait DescribesGet extends DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+        describeGet(d._1, d._2, d._3)
+    }
+
+    trait DescribesDelete extends DescribesBase {
+        this: unfiltered.request.Params.Extract[_,_] =>
+        describeDelete(describe._1, describe._2, describe._3)
+    }
+
 }

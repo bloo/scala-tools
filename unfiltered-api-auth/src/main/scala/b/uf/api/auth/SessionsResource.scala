@@ -1,6 +1,6 @@
 package b.uf.api.auth
 
-import b.uf.api.Resource
+import b.uf.api.{Resource, Descriptive}
 import org.joda.time.DateTime
 import net.liftweb.json.DefaultFormats
 import net.liftweb.json.Extraction.decompose
@@ -11,17 +11,21 @@ import unfiltered.request.HttpRequest
 
 class SessionsResource[T, S](path: String = "sessions")
 	extends Resource[T, S](path)
-    with BasicResourceAuthComponent[T, S] {
+	with Descriptive[T]
+    with BasicResourceAuthComponent[T, S] {    
     this: TokenComponent[T] with SessionComponent[T, S] =>
 
-    // find our user's session, ignore 'id', as it's "local"
+    // find our user's session
     //
     override def resolve = {
         case (_,id) if ("local" == id) => sessionService.local
         case (_,id) => sessionService get id
     }
 
-    object Remember extends b.uf.params.Flag("remember")
+    object Remember extends b.uf.params.Flag("remember") with DescribesRawCreate {
+        def describe = ("remember", false,
+                <p>When set to 1 or true, a 'remember me' token will be created and saved in a cookie.</p>)
+    }
     
     rcreate {
         case (ctx) => { _ =>
@@ -46,7 +50,6 @@ class SessionsResource[T, S](path: String = "sessions")
     }
 
     delete {
-        // delete will unauthenticate, that is remove, the session
         case (ctx) if ctx hasAuth => sessionService.remove(_)
     }
 }

@@ -21,8 +21,8 @@ case class ResourceDescriptor(
         val description: Option[String],
         val operations: Seq[SupportedOp])
 
-class ResourceDescriptionsResource[T]
-	extends Resource[T,ResourceDescriptor]("resources")
+class ResourceDescriptionsResource[T](resourcePath: String = "resources")
+	extends Resource[T,ResourceDescriptor](resourcePath)
 	with Descriptive[T] {
     this: ResourceAuthComponent[T] =>
     
@@ -35,20 +35,18 @@ class ResourceDescriptionsResource[T]
     
     get { case (ctx) => Some(_) }
     
-    describe(Html(
+    describe {
         <p>
     		This resource tracks the registrations and descriptions of the other
     		ResourcePlans so that they can be displayed to the end user.
     	</p>
-    ))
+    }
     
     query { case (ctx) => { qp =>
         	val descs = Descriptive.plans[T].values.map {
         	    case (plan) => plan.describe(ctx)
         	}
         	
-        	// TODO ordering
-        	//
         	(qp.size match {
         	    case Some(sz) if sz > 0 => qp.page match {
         	        case Some(pg) if pg > 0 => descs.drop(pg*sz).take(sz)
