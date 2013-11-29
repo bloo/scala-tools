@@ -38,21 +38,27 @@ package object slick {
     // implicit converters that wrap CompiledExcetuable or Query instances within a QueryPager
     // that will then list its results using pagination params via .paginate(PagerParams, QQ=>O)
     //
-    implicit def query_2_queryPager[QQ, R](q: Query[QQ, _<:R]) = new QueryPager(q)
+    implicit def query_2_pagedQuery[QQ, R](q: Query[QQ, _<:R]) = new PagedQuery(q)
     import scala.slick.lifted.{CompiledExecutable=>CE,AppliedCompiledFunction=>ACF}
 //    implicit def compiled_2_queryPager[QQ, R](c: CE[Query[QQ,_<:R],_]) = new QueryPager(c.extract)
 //    implicit def compiledf_2_queryPager[QQ, R](c: ACF[_,Query[_,_<:R],_]) = new QueryPager(c.extract)
     
-    object QueryPager {
+    object PagedQuery {
         case class Page(page: Option[Int], size: Option[Int])
     }
-    type Page = QueryPager.Page
+    type Page = PagedQuery.Page
 
     import simple.{ Query, queryToAppliedQueryInvoker }
-    class QueryPager[QQ, R](q: Query[QQ, _ <: R]) extends b.log.Logger {
-        def paginate[O <% scala.slick.lifted.Ordered](pp: Page, sorter: QQ=>O)(implicit s: Session): List[R] = paginate(pp.page, pp.size, sorter)
-        def paginate[O <% scala.slick.lifted.Ordered](page: Option[Int], size: Option[Int], sorter: QQ=>O)(implicit s: Session) = {
-            val sorted = q sortBy sorter
+    class PagedQuery[QQ, R](q: Query[QQ, _ <: R]) extends b.log.Logger {
+        def paginate(pp: Page)(implicit s: Session): List[R] = paginate(pp.page, pp.size, None)
+        def paginate[O <% scala.slick.lifted.Ordered](pp: Page, sorter: QQ=>O)(implicit s: Session): List[R] = paginate(pp.page, pp.size, Some(sorter))
+        def paginate[O <% scala.slick.lifted.Ordered](page: Option[Int], size: Option[Int], sorterOpt: Option[QQ=>O])(implicit s: Session) = {
+
+            val sorted = sorterOpt match {
+                case Some(sorter) => q sortBy sorter
+                case None => q
+            }
+            
             val pq = (size match {
                 case Some(sz) => {
                     val ps = (page getOrElse 1) - 1

@@ -292,7 +292,7 @@ abstract class Resource[T, R](
         }
 
         val json = gCntAndSize match {
-            case Some((gCnt, gSize)) => {
+            case Some((gCnt, gSize)) if results.length > 0 => {
 
                 // if transpose is true and gCnt & gSize are defined,
                 // we'll reorder the results list so that the .grouped(Seq)
