@@ -58,7 +58,7 @@ package object slick {
                 case Some(sorter) => q sortBy sorter
                 case None => q
             }
-            
+
             val pq = (size match {
                 case Some(sz) => {
                     val ps = (page getOrElse 1) - 1

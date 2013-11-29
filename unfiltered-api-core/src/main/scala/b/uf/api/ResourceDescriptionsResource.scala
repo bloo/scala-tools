@@ -53,7 +53,7 @@ class ResourceDescriptionsResource[T](resourcePath: String = "resources")
         	        case None => descs.take(sz)
         	    }
         	    case None => descs
-        	}).toSeq.sortBy(_.path).reverse
+        	}).toList.sortBy(_.path).reverse
     	}
     }
     

@@ -28,29 +28,27 @@ case class Context[T](req: HttpRequest[_], auth: Option[T], pathIds: Map[String,
 case class PageParams(page: Option[Int] = None, size: Option[Int])
 case class CountResult(val count: Int)
 case class ResourceErrorJson(val code: Int, val messages: Seq[String])
-case class QueryResultGroup[R](val group: Seq[R])
+case class QueryResultGroup[R](val group: List[R])
 
-trait ResourceSerializer[T,R] {
-    def ser: PartialFunction[Context[T], Either[R=>String,ResourceErrorJson]]
+trait ResourceSerializer[T, R] {
+    def ser: PartialFunction[Context[T], Either[R => String, ResourceErrorJson]]
 }
 
 trait ResourceCountSerializer[T] {
-    def ser: PartialFunction[Context[T], Either[CountResult=>String,ResourceErrorJson]]
+    def ser: PartialFunction[Context[T], Either[CountResult => String, ResourceErrorJson]]
 }
 
-trait ResourceQuerySerializer[T,R] {
-    def ser: PartialFunction[Context[T], Either[Seq[R]=>String,ResourceErrorJson]]
-    def serGroup: PartialFunction[Context[T], Either[QueryResultGroup[R]=>String,ResourceErrorJson]]
+trait ResourceQuerySerializer[T, R] {
+    def ser: PartialFunction[Context[T], Either[List[R] => String, ResourceErrorJson]]
+    def serGroup: PartialFunction[Context[T], Either[QueryResultGroup[R] => String, ResourceErrorJson]]
 }
 
-trait ResourceDeserializer[T,R] {
-    def deser: PartialFunction[Context[T], Either[(String,Manifest[R])=>R,ResourceErrorJson]]
+trait ResourceDeserializer[T, R] {
+    def deser: PartialFunction[Context[T], Either[(String, Manifest[R]) => R, ResourceErrorJson]]
 }
 
 object Resource {
-
-    private val foo = ""
-        
+    
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
             case (res, plan) => res.FullPath
@@ -85,64 +83,64 @@ object Resource {
         extract[O](parse(json))
     }
 
-    private trait LowPriorityResourceImplicits[T,R] {
+    private trait LowPriorityResourceImplicits[T, R] {
 
-        implicit def serResourceToJsonOrXml: ResourceSerializer[T,R] = 
-            new ResourceSerializer[T,R] with JsonOrXml[R] {
-	    	def ser = _.req match {
-	    	    case Accepts.Json(_) => Left(_toJson)
-	    	    case Accepts.Xml(_) => Left(_toXml)
-	    	    case _ => Right(ResourceErrorJson(0,Seq()))
-	    	}
-	    }
-		
-		implicit def serResourcesToJsonOrXml: ResourceQuerySerializer[T,R] =
-		    new ResourceQuerySerializer[T,R] with JsonOrXml[R] {
-	    	def ser = _.req match {
-	    	    case Accepts.Json(_) => Left(_toJson)
-	    	    case Accepts.Xml(_) => Left(_toXml)
-	    	    case _ => Right(ResourceErrorJson(0,Seq()))
-	    	}
-	    	def serGroup = _.req match {
-	    	    case Accepts.Json(_) => Left(_toJson)
-	    	    case Accepts.Xml(_) => Left(_toXml)
-	    	    case _ => Right(ResourceErrorJson(0,Seq()))
-	    	}
-	    }
-		
-	    implicit def deserFromJson: ResourceDeserializer[T,R] =
-	        new ResourceDeserializer[T,R] with JsonOrXml[R] {
-	    	def deser = _.req match {
-	    	    case RequestContentType("application/json") => Left(_fromJson(_)(_))
-	    	    case _ => Right(ResourceErrorJson(0,Seq()))
-	    	}	    	
-	    }
-		
-	    trait JsonOrXml[R] {
-	        import net.liftweb.json._
-	        import net.liftweb.json.Extraction._
-	        // brings in default date formats etc.
-	        implicit val formats = DefaultFormats + BigDecimalSerializer
-	        protected def _toJson(obj: Any): String = {
-		        val doc = render(decompose(obj))
-		        //if (!prettyJson) pretty(doc) else compact(doc)  
-		        compact(doc)
-	        }
-	        protected def _toXml(obj: Any): String = {
-		        val doc = decompose(obj)
-		        Xml toXml (doc) toString
-	        }
-	        protected def _fromJson(data: String)(implicit mf: Manifest[R]): R = {
-	            extract[R](parse(data))
-	        }
-	    }	    
-	}    
+        implicit def serResourceToJsonOrXml: ResourceSerializer[T, R] =
+            new ResourceSerializer[T, R] with JsonOrXml[R] {
+                def ser = _.req match {
+                    case Accepts.Json(_) => Left(_toJson)
+                    case Accepts.Xml(_) => Left(_toXml)
+                    case _ => Right(ResourceErrorJson(0, Seq()))
+                }
+            }
+
+        implicit def serResourcesToJsonOrXml: ResourceQuerySerializer[T, R] =
+            new ResourceQuerySerializer[T, R] with JsonOrXml[R] {
+                def ser = _.req match {
+                    case Accepts.Json(_) => Left(_toJson)
+                    case Accepts.Xml(_) => Left(_toXml)
+                    case _ => Right(ResourceErrorJson(0, Seq()))
+                }
+                def serGroup = _.req match {
+                    case Accepts.Json(_) => Left(_toJson)
+                    case Accepts.Xml(_) => Left(_toXml)
+                    case _ => Right(ResourceErrorJson(0, Seq()))
+                }
+            }
+
+        implicit def deserFromJson: ResourceDeserializer[T, R] =
+            new ResourceDeserializer[T, R] with JsonOrXml[R] {
+                def deser = _.req match {
+                    case RequestContentType("application/json") => Left(_fromJson(_)(_))
+                    case _ => Right(ResourceErrorJson(0, Seq()))
+                }
+            }
+
+        trait JsonOrXml[R] {
+            import net.liftweb.json._
+            import net.liftweb.json.Extraction._
+            // brings in default date formats etc.
+            implicit val formats = DefaultFormats + BigDecimalSerializer
+            protected def _toJson(obj: Any): String = {
+                val doc = render(decompose(obj))
+                //if (!prettyJson) pretty(doc) else compact(doc)  
+                compact(doc)
+            }
+            protected def _toXml(obj: Any): String = {
+                val doc = decompose(obj)
+                Xml toXml (doc) toString
+            }
+            protected def _fromJson(data: String)(implicit mf: Manifest[R]): R = {
+                extract[R](parse(data))
+            }
+        }
+    }
 }
 
 abstract class Resource[T, R](
     val resourcePath: String,
     val maxPageSize: Option[Int] = None)
-    extends b.log.Logger {//with Resource.LowPriorityResourceImplicits[R] {
+    extends b.log.Logger { //with Resource.LowPriorityResourceImplicits[R] {
 
     this: ResourceAuthComponent[T] =>
 
@@ -206,48 +204,48 @@ abstract class Resource[T, R](
     type RawCreator = PartialFunction[Context[T], String => Option[R]]
     protected var _rawCreator: RawCreator = Map.empty
     def rcreate(c: RawCreator) = _rawCreator = c
-//    def rcreate(c: RawCreator)(implicit ds: ResourceDeserializer[T], s: ResourceSerializer[T]) = _rawCreator = c
+    //    def rcreate(c: RawCreator)(implicit ds: ResourceDeserializer[T], s: ResourceSerializer[T]) = _rawCreator = c
 
     type Getter = PartialFunction[Context[T], R => Option[R]]
     protected var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
-//    protected var _getterDeser: ResourceDeserializer[R] = null
-//    protected var _getterSer: ResourceSerializer[R] = null
-//    def get(g: Getter)(implicit ds: ResourceDeserializer[R], s: ResourceSerializer[R]) = {
-//        _getter = g
-//        _getterDeser = ds
-//        _getterSer = s
-//    }
+    //    protected var _getterDeser: ResourceDeserializer[R] = null
+    //    protected var _getterSer: ResourceSerializer[R] = null
+    //    def get(g: Getter)(implicit ds: ResourceDeserializer[R], s: ResourceSerializer[R]) = {
+    //        _getter = g
+    //        _getterDeser = ds
+    //        _getterSer = s
+    //    }
 
     type Updater = PartialFunction[Context[T], (R, R) => Option[R]]
     protected var _updater: Updater = Map.empty
     def update(u: Updater) = _updater = u
-//    protected var _updaterDeser: ResourceDeserializer[R] = null
-//    protected var _updaterSer: ResourceSerializer[R] = null
-//    protected var _updater: Updater = Map.empty
-//    def update(u: Updater)(implicit ds: ResourceDeserializer[R], s: ResourceSerializer[R]) = {
-//        _updater = u
-//        _updaterDeser = ds
-//        _updaterSer = s
-//    }
+    //    protected var _updaterDeser: ResourceDeserializer[R] = null
+    //    protected var _updaterSer: ResourceSerializer[R] = null
+    //    protected var _updater: Updater = Map.empty
+    //    def update(u: Updater)(implicit ds: ResourceDeserializer[R], s: ResourceSerializer[R]) = {
+    //        _updater = u
+    //        _updaterDeser = ds
+    //        _updaterSer = s
+    //    }
 
     type Deleter = PartialFunction[Context[T], R => Boolean]
     protected var _deleter: Deleter = Map.empty
     def delete(d: Deleter) = _deleter = d
-//    def delete(d: Deleter)(implicit ds: ResourceDeserializer[R]) = { _deleter = d; _deleterDeser = ds }
-//    protected var _deleterDeser: ResourceDeserializer[R] = null
+    //    def delete(d: Deleter)(implicit ds: ResourceDeserializer[R]) = { _deleter = d; _deleterDeser = ds }
+    //    protected var _deleterDeser: ResourceDeserializer[R] = null
 
     type Counter = PartialFunction[Context[T], () => Int]
     protected var _counter: Counter = Map.empty
     def count(c: Counter) = _counter = c
-//    def count(c: Counter)(implicit s: ResourceCountSerializer) = { _counter = c; _counterSer = s }
-//    protected var _counterSer: ResourceCountSerializer = null
+    //    def count(c: Counter)(implicit s: ResourceCountSerializer) = { _counter = c; _counterSer = s }
+    //    protected var _counterSer: ResourceCountSerializer = null
 
-    type Querier = PartialFunction[Context[T], PageParams => Seq[R]]
+    type Querier = PartialFunction[Context[T], PageParams => List[R]]
     protected var _querier: Querier = Map.empty
     def query(q: Querier) = _querier = q
-//    def query(q: Querier)(implicit s: ResourceQuerySerializer[R]) = { _querier = q; _querierSer = s }
-//    protected var _querierSer: ResourceQuerySerializer[R] = null
+    //    def query(q: Querier)(implicit s: ResourceQuerySerializer[R]) = { _querier = q; _querierSer = s }
+    //    protected var _querierSer: ResourceQuerySerializer[R] = null
 
     // resource converters; by default they will use the from|toJson
     // helper methods, but they can be overridden for custom handling.
@@ -264,12 +262,12 @@ abstract class Resource[T, R](
         case Accepts.Xml(_) => toXml(cnt)
     }
 
-    def serializeQuery(ctx: Context[T], resources: Seq[R]): String = ctx.req match {
+    def serializeQuery(ctx: Context[T], resources: List[R]): String = ctx.req match {
         case Accepts.Json(_) => toJson(resources)
         case Accepts.Xml(_) => toXml(resources)
     }
 
-    def serializeQueryGroup(ctx: Context[T], resources: Seq[QueryResultGroup[R]]): String = ctx.req match {
+    def serializeQueryGroup(ctx: Context[T], resources: List[QueryResultGroup[R]]): String = ctx.req match {
         case Accepts.Json(_) => toJson(resources)
         case Accepts.Xml(_) => toXml(resources)
     }
@@ -280,7 +278,7 @@ abstract class Resource[T, R](
     private implicit def resourceToResponse(cr: (Context[T], R)): ResponseFunction[Any] =
         JsonContent ~> ResponseString(serializeGet(cr._1, cr._2))
 
-    private implicit def resourcesToResponse(cr: (Context[T], Seq[R], Option[Int], Option[Int], Boolean)): ResponseFunction[Any] = {
+    private implicit def resourcesToResponse(cr: (Context[T], List[R], Option[Int], Option[Int], Boolean)): ResponseFunction[Any] = {
         val (ctx, results, groups, groupSize, groupTranspose) = cr
 
         // calculate group cnt and group size depending on which was defined
@@ -301,7 +299,8 @@ abstract class Resource[T, R](
                 val groupMe = if (groupTranspose) {
 
                     val transposed = new collection.mutable.ArraySeq[R](results.length)
-                    // this isn't very elegant.. but at least it's O(n)
+                    // this isn't very elegant.. but at least it's O(n)..
+                    // there's prob a @tailrec recursive way of doing this.
                     var start = 0
                     val end = results.length - 1
                     var sourceIdx = 0
@@ -315,12 +314,12 @@ abstract class Resource[T, R](
                     // 'transposed' now contains the same elements as results, but in
                     // an order that a call to .grouped will get us the transposed
                     // grouping that we want
-                    transposed
+                    transposed.toList
                 } else results
 
                 // group query result by requested group size
                 //
-                val grouped = groupMe.grouped(gSize).toSeq.map(QueryResultGroup(_))
+                val grouped = groupMe.grouped(gSize).toList.map(s=>QueryResultGroup(s.toList))
                 serializeQueryGroup(ctx, grouped)
             }
 
