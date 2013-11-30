@@ -324,7 +324,7 @@ abstract class Resource[T, R](
             }
 
             // simply serialize result seq as one ungrouped list
-            case None => serializeQuery(ctx, results)
+            case _ => serializeQuery(ctx, results)
         }
         JsonContent ~> ResponseString(json)
     }
