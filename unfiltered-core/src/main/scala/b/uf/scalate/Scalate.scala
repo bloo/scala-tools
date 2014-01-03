@@ -16,11 +16,13 @@ object Scalate {
 
 trait Scalate extends b.log.Logger {
 
-    def global(attr: (String, Any)) = globals = globals :+ attr
+    def global(attr: (String, Any)) = globals = globals.filter{ case (k,_) => k != attr._1 } :+ attr
     def prefix(pre: String) = pathPrefix = pre
 
     private var globals: List[(String, Any)] = Nil
     private var pathPrefix: String = ""
+
+    def onTemplate(template: String) = {} // override in subclass
 
     def t[A](path: String, req: HttpRequest[A]): ResponseWriter =
         t(path, path.replaceAll("^/", "").replaceAll("/", " ").capitalize, req)
@@ -35,17 +37,20 @@ trait Scalate extends b.log.Logger {
         r(path, req, (List("title" -> title) ::: attributes.toList): _*)
 
     def r[A](path: String, req: HttpRequest[A]): ResponseWriter =
-        respond(pathPrefix + "/" + path.replaceAll("^/", ""), req, globals: _*)
+        respond(pathPrefix + "/" + path.replaceAll("^/", ""), req, Nil: _*)
 
     def r[A](path: String, req: HttpRequest[A], attribute: (String, Any)): ResponseWriter =
-        respond(pathPrefix + "/" + path.replaceAll("^/", ""), req, (attribute :: globals): _*)
+        respond(pathPrefix + "/" + path.replaceAll("^/", ""), req, (attribute :: Nil): _*)
 
     def r[A](path: String, req: HttpRequest[A], attributes: (String, Any)*): ResponseWriter =
-        respond(pathPrefix + "/" + path.replaceAll("^/", ""), req, (attributes.toList ::: globals): _*)
+        respond(pathPrefix + "/" + path.replaceAll("^/", ""), req, attributes: _*)
 
-    def respond[A](template: String, request: HttpRequest[A], attributes: (String, Any)*) = new ResponseWriter {
-        def write(writer: OutputStreamWriter) {
-            Scalate.cfg.render(template, writer, attributes:_*)
+    def respond[A](template: String, request: HttpRequest[A], attributes: (String, Any)*) = {
+        onTemplate(template)
+        new ResponseWriter {
+            def write(writer: OutputStreamWriter) {
+                Scalate.cfg.render(template, writer, (attributes.toList ::: globals): _*)
+            }
         }
     }
 }
