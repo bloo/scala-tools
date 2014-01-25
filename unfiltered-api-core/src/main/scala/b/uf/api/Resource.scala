@@ -47,7 +47,53 @@ trait ResourceDeserializer[T, R] {
     def deser: PartialFunction[Context[T], Either[(String, Manifest[R]) => R, ResourceErrorJson]]
 }
 
+
+trait RAC extends ResourceAuthComponent[String] {
+    def authService = new AuthService[String] {
+        def authenticate[X](req: unfiltered.request.HttpRequest[X]) = None
+    }
+}
+
+class Test[R:Manifest] extends Resource[String, R]("foo") with RAC {
+    override def resolve = { case _ => None }   
+    def go(json: String) = {
+        deserialize(null, json)
+    }
+}
+
 object Resource {
+    
+    def main(args: Array[String]) = {
+        case class Attr(name: String, rating: Double)
+        case class Foo(email: String, firstName: String, attrs: List[Attr])
+        val attrs = List(Attr("foo", 3.0), Attr("bar", 1.9))
+        val foo = Foo("foo@aol.com", "Foozius", attrs)
+        println(foo)
+        val json = toJson(foo)
+        println(json)
+        val newFoo = fromJson[Foo](json)
+        println(newFoo)
+
+        val manualJson = """
+{
+  "email":"foo@aol.com",
+  "firstName":"Foozius",
+  "attrs":[]
+}            
+"""            
+        val manFoo = fromJson[Foo](manualJson)
+        println(manFoo)
+        
+        val rsrc = new Test[Foo]
+        val json2 = rsrc.toJson(foo)
+        val newFoo2 = rsrc.go(json2)
+        println(newFoo2)
+        
+        val newFoo3 = rsrc.go(json)
+        println(newFoo3)
+        val newFoo4 = rsrc.go(manualJson)
+        println(newFoo4)
+    }
     
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
@@ -137,7 +183,7 @@ object Resource {
     }
 }
 
-abstract class Resource[T, R](
+abstract class Resource[T, R:Manifest](
     val resourcePath: String,
     val maxPageSize: Option[Int] = None)
     extends b.log.Logger { //with Resource.LowPriorityResourceImplicits[R] {
@@ -184,7 +230,7 @@ abstract class Resource[T, R](
 
     def toJson(obj: Any): String = Resource toJson obj
     def toXml(obj: Any): String = Resource toXml (resourcePath, obj)
-    def fromJson[O](json: String)(implicit mf: Manifest[O]): O = Resource fromJson json
+    def fromJson[O](json: String)(implicit mf: Manifest[O]): O = Resource.fromJson[O](json)
 
     private def reject(ctx: Context[T], resp: ErrorResponse): ResponseFunction[Any] = ctx.auth match {
         //case Some(_) => Forbidden ~> resp // authenticated but unauthorized
@@ -250,7 +296,11 @@ abstract class Resource[T, R](
     // resource converters; by default they will use the from|toJson
     // helper methods, but they can be overridden for custom handling.
     //
-    def deserialize(ctx: Context[T], data: String): R = fromJson(data)
+    def deserialize(ctx: Context[T], data: String): R = {
+        if (logger.isDebugEnabled)
+            logger.debug("deserializing: " + data)
+        fromJson(data)
+    }
 
     def serializeGet(ctx: Context[T], resource: R): String = ctx.req match {
         case Accepts.Json(_) => toJson(resource)

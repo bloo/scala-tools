@@ -3,7 +3,7 @@ package b.uf.api.storage
 import b.storage._
 import b.uf.api._
 
-abstract class StorageResource[T](path: String, maxPageSize: Option[Int] = None)
+abstract class StorageResource[T](path: String, maxPageSize: Option[Int] = None)(implicit mf: Manifest[T])
     extends Resource[T, ObjectMeta[T]](path, maxPageSize) 
     with b.log.Logger {
 
