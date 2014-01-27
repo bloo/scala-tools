@@ -109,8 +109,6 @@ trait Descriptive[T] {
             ms += SupportedOp("query", "GET", FullPath, _querierParams ++ Descriptive.globalQueryParams)
         if (_creator isDefinedAt ctx)
             ms += SupportedOp("create", "POST", FullPath + " (with JSON in the request body)", _creatorParams)
-        if (_rawCreator isDefinedAt ctx)
-            ms += SupportedOp("rawCreate", "POST", FullPath + " (with custom request body and/or params required)", _rawCreatorParams)
         if (_updater isDefinedAt ctx)
             ms += SupportedOp("update", "PUT", FullPath + "/:" + ResourceIdParam + " (with JSON in the request body)", _updaterParams)
         if (_deleter isDefinedAt ctx)
@@ -128,7 +126,6 @@ trait Descriptive[T] {
     private val _getterParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _querierParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _creatorParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
-    private val _rawCreatorParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _updaterParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     private val _deleterParams = collection.mutable.ArrayBuffer[ParamDescriptor]()
     
@@ -138,15 +135,12 @@ trait Descriptive[T] {
         _querierParams += ParamDescriptor(paramName, Some(desc.toString), required)
     private def describeCreate(paramName: String, required: Boolean, desc: xml.Elem) =
         _creatorParams += ParamDescriptor(paramName, Some(desc.toString), required)
-    private def describeRawCreate(paramName: String, required: Boolean, desc: xml.Elem) =
-        _rawCreatorParams += ParamDescriptor(paramName, Some(desc.toString), required)
     private def describeUpdate(paramName: String, required: Boolean, desc: xml.Elem) =
         _updaterParams += ParamDescriptor(paramName, Some(desc.toString), required)
     private def describeGet(paramName: String, required: Boolean, desc: xml.Elem) =
         _getterParams += ParamDescriptor(paramName, Some(desc.toString), required)
     private def describeDelete(paramName: String, required: Boolean, desc: xml.Elem) =
         _deleterParams += ParamDescriptor(paramName, Some(desc.toString), required)
-        
         
     trait DescribesBase {
         this: unfiltered.request.Params.Extract[_,_] =>
@@ -164,11 +158,6 @@ trait Descriptive[T] {
         describeCreate(d._1, d._2, d._3)
     }
 
-    trait DescribesRawCreate extends DescribesBase {
-        this: unfiltered.request.Params.Extract[_,_] =>
-        describeRawCreate(d._1, d._2, d._3)
-    }
-
     trait DescribesUpdate extends DescribesBase {
         this: unfiltered.request.Params.Extract[_,_] =>
         describeUpdate(d._1, d._2, d._3)
@@ -183,5 +172,4 @@ trait Descriptive[T] {
         this: unfiltered.request.Params.Extract[_,_] =>
         describeDelete(describe._1, describe._2, describe._3)
     }
-
 }

@@ -22,12 +22,12 @@ class SessionsResource[T, S:Manifest](path: String = "sessions")
         case (_,id) => sessionService get id
     }
 
-    object Remember extends b.uf.params.Flag("remember") with DescribesRawCreate {
+    object Remember extends b.uf.params.Flag("remember") with DescribesCreate {
         def describe = ("remember", false,
                 <p>When set to 1 or true, a 'remember me' token will be created and saved in a cookie.</p>)
     }
-    
-    rcreate {
+        
+    create {
         case (ctx) => { _ =>
             ctx auth match {
                 // if request was auth'ed, we'll create a

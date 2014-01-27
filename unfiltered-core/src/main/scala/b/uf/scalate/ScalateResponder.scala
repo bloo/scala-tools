@@ -6,16 +6,18 @@ import unfiltered.response._
 import java.io.OutputStreamWriter
 import b.scalate._
 
-object Scalate {
-    private var cfg: ScalateEngine = null
-    def config(debug: Boolean = false, cfg: ScalateEngine = new ScalateEngine(".jade", "templates/html", "layouts/default.jade")) = {
-        cfg setDebug debug
-        Scalate.cfg = cfg
+object ScalateResponder {
+    private var cfg: Option[ScalateEngine] = None
+    def config(debug: Boolean = false, engine: ScalateEngine = new ScalateEngine(".jade", "scalate/www", "layouts/default.jade")) = {
+        engine setDebug debug
+        ScalateResponder.cfg = Some(engine)
     }
 }
 
-trait Scalate extends b.log.Logger {
+trait ScalateResponder extends b.log.Logger {
 
+    def render = ScalateResponder.cfg.get.render _
+    
     def global(attr: (String, Any)) = globals = globals.filter{ case (k,_) => k != attr._1 } :+ attr
     def prefix(pre: String) = pathPrefix = pre
 
@@ -49,7 +51,7 @@ trait Scalate extends b.log.Logger {
         onTemplate(template)
         new ResponseWriter {
             def write(writer: OutputStreamWriter) {
-                Scalate.cfg.render(template, writer, (attributes.toList ::: globals): _*)
+                render(template, writer, (attributes.toList ::: globals))
             }
         }
     }
