@@ -29,10 +29,9 @@ trait ResourceSpecBase[T, R, RR <: b.uf.api.Resource[T,R]]
 
     // http://dispatch-classic.databinder.net/Try+Dispatch.html
     import dispatch.classic._
-    import b.uf.api.Resource.fromJson
 
     // from: unfiltered.specs2.jetty.Served
-    def setup = { server =>
+    override def setup = { server =>
     	val res = resource
     	val plan = res.plan(group, version)
     	_pathPrefix = Some(res.FullPath.replaceFirst("/", ""))        
@@ -41,8 +40,10 @@ trait ResourceSpecBase[T, R, RR <: b.uf.api.Resource[T,R]]
 
     def newReq(id: String, requester: Option[Requester], params: Seq[(String,String)]): Request =
         newReq(Some(id), requester, params)
+        
     def newReq(requester: Option[Requester], params: Seq[(String,String)]): Request =
         newReq(None, requester, params)
+
     def newReq(id: Option[String], requester: Option[Requester], params: Seq[(String,String)]): Request = {
         val path = id match {
             case Some(i) => pathPrefix + "/" + i
@@ -58,7 +59,7 @@ trait ResourceSpecBase[T, R, RR <: b.uf.api.Resource[T,R]]
 
     private def _reqToStatusAndResult(req: dispatch.classic.Request)(implicit mf: Manifest[R]): Handler[(Int,Option[R])] = {
         req >:> Predef.identity apply {
-            case (status, _, Some(entity), _) if status == 200 | status == 201 => {
+            case (status, _, Some(entity), _) if status == 200 || status == 201 => {
 		    	val jsonOut = _entityToJson(entity)
                 (status, Some(fromJson[R](jsonOut)))
             }
@@ -68,7 +69,7 @@ trait ResourceSpecBase[T, R, RR <: b.uf.api.Resource[T,R]]
     
     private def _reqToStatusAndResults(req: dispatch.classic.Request)(implicit mf: Manifest[R]): Handler[(Int,Option[List[R]])] = {
         req >:> Predef.identity apply {
-            case (status, _, Some(entity), _) if status == 200 | status == 201 => {
+            case (status, _, Some(entity), _) if status == 200 || status == 201 => {
 		    	val jsonOut = _entityToJson(entity)
                 (status, Some(fromJson[List[R]](jsonOut)))
             }
@@ -130,4 +131,11 @@ trait ResourceSpecBase[T, R, RR <: b.uf.api.Resource[T,R]]
         val resultJson = http(newReq(id, requester, params) <<< (json) as_str)
         fromJson[R](resultJson)
     }    
+    
+    private def fromJson[O](json: String)(implicit mf: Manifest[O]): O = {
+        import net.liftweb.json._
+        import net.liftweb.json.Extraction._
+        implicit val formats = DefaultFormats + b.uf.api.BigDecimalSerializer // Brings in default date formats etc.
+        extract[O](parse(json))
+    }
 }

@@ -31,6 +31,8 @@ case class QueryResultGroup[R](val group: List[R])
 
 object Resource {
 
+	var prettyJson = false
+
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {
             case (res, plan) => res.FullPath
@@ -38,38 +40,28 @@ object Resource {
         list.reverse.foreach { case (res, plan) => cb.filter(plan) }
     }
 
-    var prettyJson = false
-
-    // helper json serializer
-    //
-    def toJson(obj: Any): String = {
-        import net.liftweb.json._
-        import net.liftweb.json.Extraction._
-        implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
-        val doc = render(decompose(obj))
-        if (!prettyJson) pretty(doc) else compact(doc)
-    }
-
-    def toXml(rootName: String, obj: Any): String = {
-        implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
-        val doc = decompose(obj)
-        Xml toXml (doc) toString
-    }
-
-    // helper json deserializer
-    //
-    def fromJson[O](json: String)(implicit mf: Manifest[O]): O = {
-        import net.liftweb.json._
-        import net.liftweb.json.Extraction._
-        implicit val formats = DefaultFormats + BigDecimalSerializer // Brings in default date formats etc.
-        extract[O](parse(json))
-    }
-
     trait LowPriorityResourceImplicits[T, R] {
 
-        def toJson(obj: Any): String = Resource toJson obj
-        def toXml(rootName: String, obj: Any): String = Resource toXml (rootName, obj)
-        def fromJson[O](json: String)(implicit mf: Manifest[O]): O = Resource.fromJson[O](json)
+        def toJson(obj: Any): String = {
+	        import net.liftweb.json._
+	        import net.liftweb.json.Extraction._
+	        implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
+	        val doc = render(decompose(obj))
+	        if (!prettyJson) pretty(doc) else compact(doc)
+        }
+        
+        def toXml(rootName: String, obj: Any): String = {
+	        implicit val formats = DefaultFormats + BigDecimalSerializer // brings in default date formats etc.
+	        val doc = decompose(obj)
+	        Xml toXml (doc) toString
+	    }
+        
+        def fromJson[O](json: String)(implicit mf: Manifest[O]): O = {
+	        import net.liftweb.json._
+	        import net.liftweb.json.Extraction._
+	        implicit val formats = DefaultFormats + BigDecimalSerializer // Brings in default date formats etc.
+	        extract[O](parse(json))
+	    }
 
         // resource converters; by default they will use the from|toJson
         // helper methods, but they can be overridden for custom handling.
@@ -181,10 +173,6 @@ abstract class Resource[T, R: Manifest](
     protected var _creator: Creator = Map.empty
     def create(c: Creator) = _creator = c
 
-//    type RawCreator = PartialFunction[Context[T], String => Option[R]]
-//    protected var _rawCreator: RawCreator = Map.empty
-//    def rcreate(c: RawCreator) = _rawCreator = c
-
     type Getter = PartialFunction[Context[T], R => Option[R]]
     protected var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
@@ -272,14 +260,30 @@ abstract class Resource[T, R: Manifest](
         error.status ~> ResponseString(json)
     }
 
+    sealed case class ResourceValidationError(field: String, message: String)
+    sealed case class ForbiddenResourceException(error: Option[ErrorResponse], validationErrors: List[ResourceValidationError]) extends Exception
+
     private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
         val ctx = Context[T](resourcePath, req, authService.authenticate(req), params)
         req match {
-            case Accepts.Json(_) | Accepts.Xml(_) => authorize(ctx, params.get(ResourceIdParam))(req)
+            case Accepts.Json(_) | Accepts.Xml(_) => try {
+                authorize(ctx, params.get(ResourceIdParam))(req)
+            } catch {
+                case re: ForbiddenResourceException => Forbidden ~> ResponseString(toJson(re))
+                case e: Throwable => throw e             
+            }
             case _ => NotAcceptable ~> ResponseString("You must accept application/json or application/xml")
         }
     }
 
+    def forbidOnValidation(field: String, message: String): Unit = forbidOnValidation((field -> message))
+
+    def forbidOnValidation(errors: (String, String)*): Unit = forbidOnValidation((errors.map { case (f,m) => ResourceValidationError(f,m) }).toList)
+
+   	def forbidOnValidation(errors: List[ResourceValidationError]): Unit = throw new ForbiddenResourceException(None, errors)
+    
+    def forbidOnError(err: ErrorResponse) = throw new ForbiddenResourceException(Some(err), Nil)
+    
     private def authorize(ctx: Context[T], resourceId: Option[String]): Plan.Intent = resourceId match {
         case Some(rid) => {
 
@@ -469,6 +473,7 @@ object ErrDeleteMissingId extends ErrorResponse(NotFound, 4003, "resource id req
 
 class ErrBadMethod(val err: String) extends ErrorResponse(MethodNotAllowed, 9999, err)
 object ErrBadMethod { def apply(method: String) = new ErrBadMethod("%s not supported" format method) }
+
 object BigDecimalSerializer extends Serializer[BigDecimal] {
     private val Class = classOf[BigDecimal]
 
