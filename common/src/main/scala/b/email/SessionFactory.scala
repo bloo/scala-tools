@@ -6,30 +6,30 @@ trait EmailSessionFactory {
     def session: Session
 }
 
-class SimpleSmtpSessionFactory(
-        host: String,
-        port: java.lang.Integer = 25)
-	extends EmailSessionFactory {
+trait SimpleSmtpSessionFactory extends EmailSessionFactory {
+
+	val host: String
+	val port = 25
 
     val props = new java.util.Properties
     props.put("mail.smtp.host", host)
-    props.put("mail.smtp.port", port)
+    props.put("mail.smtp.port", port.asInstanceOf[java.lang.Integer])
     
     override def session: Session = Session.getInstance(props)
 }
 
-class SslSmtpSessionFactory(
-        user: String,
-        password: String,
-        host: String,
-        port: java.lang.Integer = 465)
-	extends EmailSessionFactory {
-    
+trait SslSmtpSessionFactory	extends EmailSessionFactory {
+
+	val user: String
+	val password: String
+    val host: String
+	val port = 465
+  
     val props = new java.util.Properties
     props.put("mail.smtp.host", host)
-    props.put("mail.smtp.port", port)
-    props.put("mail.smtp.port", port)
-    props.put("mail.smtp.socketFactory.port", port)
+    props.put("mail.smtp.port", port.asInstanceOf[java.lang.Integer])
+    props.put("mail.smtp.port", port.asInstanceOf[java.lang.Integer])
+    props.put("mail.smtp.socketFactory.port", port.asInstanceOf[java.lang.Integer])
     props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory")
     props.put("mail.smtp.auth", "true")
 
