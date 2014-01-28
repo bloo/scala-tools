@@ -215,6 +215,23 @@
 				<groupId>org.fusesource.scalate</groupId>
 				<artifactId>scalate-core_${sv}</artifactId>
 				<version>${scalate.version}</version>
+				<exclusions>
+					<!-- exclude these here for 2 reasons:
+						1. the versions have to match exact! scalate-core
+						imports 2.10.0 but as of 2.10.3, there are diff method
+						signatures
+						2. we don't want to include these jars by default during
+						deployment, if we're compiling scalate templates during build
+					 -->
+					<exclusion>
+						<groupId>org.scala-lang</groupId>
+						<artifactId>scala-compiler</artifactId>
+					</exclusion>
+					<exclusion>
+						<groupId>org.scala-lang</groupId>
+						<artifactId>scala-reflect</artifactId>
+					</exclusion>
+				</exclusions>
 			</dependency>
 			<dependency>
 				<groupId>org.fusesource.scalamd</groupId>
@@ -226,6 +243,19 @@
 				<groupId>net.liftweb</groupId>
 				<artifactId>lift-json_${sv}</artifactId>
 				<version>${lift-json.version}</version>
+				<exclusions>
+					<!-- exclude these here for 2 reasons:
+						1. the versions have to match exact! scalate-core
+						imports 2.10.0 but as of 2.10.3, there are diff method
+						signatures
+						2. we don't want to include these jars by default during
+						deployment, if we're compiling scalate templates during build
+					 -->
+					<exclusion>
+						<groupId>org.scala-lang</groupId>
+						<artifactId>scala-compiler</artifactId>
+					</exclusion>
+				</exclusions>
 			</dependency>
 
 			<dependency>
