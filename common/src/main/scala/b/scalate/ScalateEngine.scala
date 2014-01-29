@@ -24,10 +24,20 @@ class ScalateEngine(templateExt: String, templatePath: String, layoutTemplate: S
         engine.allowReload = debug
         engine.mode = if (debug) "development" else "production"
     }
-    
-    def render(template: String, writer: Writer, attributes: (String, Any)*) = {
+
+    private def fullResourcePath(template: String) = {
     	val path = if (template.endsWith(templateExt)) template else template + templateExt
 		val tmpl = templatePath + "/" + path
+		(path, tmpl)
+    }
+
+    def templateExists(template: String) = {
+    	val (_,tmpl) = fullResourcePath(template)
+    	engine.resourceLoader.exists(tmpl)
+    }
+    
+    def render(template: String, writer: Writer, attributes: (String, Any)*) = {
+    	val (path,tmpl) = fullResourcePath(template)
     	try {
     		val context = renderContext(path, new PrintWriter(writer), engine)
     		attributes foreach { case (k, v) => context.attributes(k) = v }

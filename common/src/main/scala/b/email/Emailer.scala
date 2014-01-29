@@ -7,6 +7,12 @@ case class EmailAdr(
     email: String,
     name: Option[String] = None)
 
+object EmailAdr {
+	def apply(email: String, fn: String, ln: String): EmailAdr = {
+		EmailAdr(email, Some("%s %s" format (fn, ln)))
+	}
+}
+
 case class MessageContext(
     template: String,
     subject: String,
@@ -23,11 +29,17 @@ object ScalateEmailer {
 
 trait ScalateEmailer {
     def render = ScalateEmailer.cfg.get.render _ 
+    def templateExists = ScalateEmailer.cfg.get.templateExists _
 }
 
 trait Emailer extends ScalateEmailer {
     this: EmailSessionFactory =>
 
+    var skipTo = false
+    var skipBcc = false
+    var skipCc = false
+    var subjectPrefix: Option[String] = None
+    
 	import javax.mail.internet.InternetAddress
 
 	implicit def msgrToInetAdr(msg: EmailAdr): InternetAddress = msg.name match {
@@ -41,10 +53,9 @@ trait Emailer extends ScalateEmailer {
 	    import javax.mail.internet.MimeMessage
 
 		val mime = new MimeMessage(session)
-		mime setSubject ctx.subject
 		mime setFrom ctx.from
 		ctx.replyTo map { rt => mime setReplyTo(Array(rt)) }
-
+		subject(ctx.subject)
 			        
         import javax.mail.BodyPart
         import javax.mail.internet.MimeMultipart
@@ -52,58 +63,64 @@ trait Emailer extends ScalateEmailer {
         import java.io.StringWriter
         import javax.mail.Transport
 
+        val mp = new MimeMultipart("alternative")
 
-	        // build html content from scalate template
-	        //
+        // build html content from scalate template
+        //
         val html = new MimeBodyPart()
         val htmlWriter = new StringWriter()
         render(ctx.template, htmlWriter, attributes)
         htmlWriter.close()
         html setContent(htmlWriter.toString(), "text/html")
+        mp addBodyPart html
 
         // build plain text content from scalate template
         //
-        val text = new MimeBodyPart()
-        val textWriter = new StringWriter()
-        render(ctx.template + ".txt", textWriter, attributes)
-        textWriter.close()
-        text setText(textWriter.toString())
+        val textTmpl = ctx.template + ".txt"
+        if (templateExists(textTmpl)) {
+	        val text = new MimeBodyPart()
+	        val textWriter = new StringWriter()
+	        render(textTmpl, textWriter, attributes)
+	        textWriter.close()
+	        text setText(textWriter.toString())
+	        mp addBodyPart text
+        }
         
         // combine parts
         //
-        val mp = new MimeMultipart("alternative")
-        mp addBodyPart text
-        mp addBodyPart html
         mime setContent mp
 		
-		def cc(cc: EmailAdr) = recipient(Message.RecipientType.CC, cc)
+        def subject(subj: String) = {
+		    val s = subjectPrefix match {
+		      case Some(pre) => "%s %s" format (pre, subj)
+		      case None => subj
+		    }
+		    mime setSubject s
+		    this
+        }
+        
+		def cc(cc: EmailAdr) =
+			if (!skipCc) recipient(Message.RecipientType.CC, cc)
+			else this
 		
-		def bcc(bcc: EmailAdr) = recipient(Message.RecipientType.BCC, bcc)
+		def bcc(bcc: EmailAdr) =
+			if (!skipBcc) recipient(Message.RecipientType.BCC, bcc)
+			else this
 
-		def to(to: EmailAdr) = recipient(Message.RecipientType.TO, to)
+		def to(to: EmailAdr) =
+			if (!skipTo) recipient(Message.RecipientType.TO, to)
+			else this
 		
-		def recipient(rt: Message.RecipientType, ea: EmailAdr) = {
+		private def recipient(rt: Message.RecipientType, ea: EmailAdr) = {
 	    	mime.setRecipient(rt, ea)
 	    	this
 	    }
 
-	    def send(to: EmailAdr): Unit = send(Some(to))
-
-	    def send(): Unit = send(None)
-
-	    def send(to: Option[EmailAdr]): Unit = {
-	        
-	        to.map { this.to(_) }
-	        
-	        // send it!
-	        //
-	        Transport send mime
-	    }
+	    def send(): Unit = Transport send mime
 	}
 	
     def compose(ctx: MessageContext, attributes: (String, Any)*): EmailMessageBuilder =
         new EmailMessageBuilder(ctx, attributes:_*)
-
 }
 
 

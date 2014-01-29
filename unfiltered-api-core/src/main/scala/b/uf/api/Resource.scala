@@ -268,28 +268,41 @@ abstract class Resource[T, R: Manifest](
         error.status ~> ResponseString(json)
     }
 
-    sealed case class ForbiddenResourceException(error: Option[ErrorResponse], validation: Map[String,String]) extends Exception
+    sealed case class ResourceException(error: Option[ErrorResponse], validation: Map[String,String]) extends Exception
 
     private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
         val ctx = Context[T](resourcePath, req, authService.authenticate(req), params)
         req match {
+        	case OPTIONS(_) => showOptions(ctx)
             case Accepts.Json(_) | Accepts.Xml(_) => try {
                 authorize(ctx, params.get(ResourceIdParam))(req)
             } catch {
-                case re: ForbiddenResourceException => Forbidden ~> ResponseString(toJson(re))
-                case e: Throwable => throw e             
+                case re: ResourceException => re.error match {
+                	case Some(err) => err.status ~> ResponseString(toJson(re))
+                	case _ => Forbidden ~> ResponseString(toJson(re))
+                }
+                case e: Throwable => throw e
             }
             case _ => NotAcceptable ~> ResponseString("You must accept application/json or application/xml")
         }
     }
 
-    def forbidOnValidation(field: String, message: String): Unit = forbidOnValidation((field -> message))
+    private def showOptions(ctx: Context[T]) = {
+    	val ms = collection.mutable.ArrayBuffer[String]()
+    	ms += "OPTIONS"
+        if ((_getter isDefinedAt ctx) || (_querier isDefinedAt ctx)) ms += "GET"
+        if (_creator isDefinedAt ctx) ms += "POST"
+        if (_updater isDefinedAt ctx) ms += "PUT"
+        if (_deleter isDefinedAt ctx) ms += "DELETE"
+    	Allow(ms.mkString(",")) ~> optionsResponseBody(ctx)
+    }
 
-    def forbidOnValidation(errors: (String, String)*): Unit = forbidOnValidation((errors.map { case (f,m) => (f,m) }).toMap)
-
-   	def forbidOnValidation(errors: Map[String,String]): Unit = throw new ForbiddenResourceException(None, errors)
+    def optionsResponseBody(ctx: Context[T]): ResponseFunction[Any] = { NoContent }
     
-    def forbidOnError(err: ErrorResponse) = throw new ForbiddenResourceException(Some(err), Map())
+    def forbidOnValidationError(field: String, message: String): Unit = forbidOnValidationError((field -> message))
+    def forbidOnValidationError(errors: (String, String)*): Unit = forbidOnValidationError((errors.map { case (f,m) => (f,m) }).toMap)
+   	def forbidOnValidationError(errors: Map[String,String]): Unit = throw new ResourceException(None, errors)
+    def resourceError(err: ErrorResponse) = throw new ResourceException(Some(err), Map())
     
     private def authorize(ctx: Context[T], resourceId: Option[String]): Plan.Intent = resourceId match {
         case Some(rid) => {

@@ -100,6 +100,10 @@ trait Descriptive[T] {
     	Descriptive.planMap.put(pathToId(FullPath), this)
     }
 
+    override def optionsResponseBody(ctx: Context[T]): unfiltered.response.ResponseFunction[Any] = {
+    	unfiltered.response.JsonContent ~> unfiltered.response.ResponseString(toJson(describe(ctx)))
+    }
+
     def describe(ctx: Context[T]) = {        
         
         val ms = collection.mutable.ArrayBuffer[SupportedOp]()
