@@ -66,6 +66,14 @@ object Resource {
         // resource converters; by default they will use the from|toJson
         // helper methods, but they can be overridden for custom handling.
         //
+        
+        /**
+         * UserResource encapsulates the Resource identity as defined by the user of the service
+         * and deserialized by the service implementation. Some services might take a different
+         * input that doesn't deserialize directly into an object R, and in those instances,
+         * UserResource(None, String) will be passed into 'create' and 'update' partial functions.
+         */
+    	case class UserResource[R](resource: Option[R], data: String)
         case class UpdateRequest(ctx: Context[T], data: String)
         case class CreateRequest(ctx: Context[T], data: String)
         case class GetResponse(ctx: Context[T], resource: R)
@@ -76,10 +84,10 @@ object Resource {
         case class QueryGroupResponse(ctx: Context[T], resources: List[QueryResultGroup[R]])
 
         implicit def deserializeUpdateReq(pkg: UpdateRequest)
-        	(implicit mf: Manifest[R]): R = fromJson[R](pkg.data)
+        	(implicit mf: Manifest[R]): UserResource[R] = UserResource[R](Some(fromJson[R](pkg.data)), pkg.data)
         	
         implicit def deserializeCreateReq(pkg: CreateRequest)
-        	(implicit mf: Manifest[R]): R = fromJson[R](pkg.data)
+        	(implicit mf: Manifest[R]): UserResource[R] = UserResource[R](Some(fromJson[R](pkg.data)), pkg.data)
 
         implicit def serializeGetResp(pkg: GetResponse): String = pkg.ctx.req match {
             case Accepts.Json(_) => toJson(pkg.resource)
@@ -163,13 +171,13 @@ abstract class Resource[T, R: Manifest](
         //case _ => WWWAuthenticate(Realm) ~> resp // might need authentication
         case _ => Forbidden ~> resp // don't use wwwauthenticate for httpbasic, to avoid popup
     }
-
+    
     // subclass needs to implement resource resolver
     //
     type Resolver = PartialFunction[(Context[T], String), Option[R]]
     def resolve: Resolver
 
-    type Creator = PartialFunction[Context[T], R => Option[R]]
+    type Creator = PartialFunction[Context[T], UserResource[R] => Option[R]]
     protected var _creator: Creator = Map.empty
     def create(c: Creator) = _creator = c
 
@@ -177,7 +185,7 @@ abstract class Resource[T, R: Manifest](
     protected var _getter: Getter = Map.empty
     def get(g: Getter) = _getter = g
 
-    type Updater = PartialFunction[Context[T], (R, R) => Option[R]]
+    type Updater = PartialFunction[Context[T], (R, UserResource[R]) => Option[R]]
     protected var _updater: Updater = Map.empty
     def update(u: Updater) = _updater = u
 
@@ -260,8 +268,7 @@ abstract class Resource[T, R: Manifest](
         error.status ~> ResponseString(json)
     }
 
-    sealed case class ResourceValidationError(field: String, message: String)
-    sealed case class ForbiddenResourceException(error: Option[ErrorResponse], validationErrors: List[ResourceValidationError]) extends Exception
+    sealed case class ForbiddenResourceException(error: Option[ErrorResponse], validation: Map[String,String]) extends Exception
 
     private def dointent(req: HttpRequest[javax.servlet.http.HttpServletRequest], params: Map[String, String]) = {
         val ctx = Context[T](resourcePath, req, authService.authenticate(req), params)
@@ -278,11 +285,11 @@ abstract class Resource[T, R: Manifest](
 
     def forbidOnValidation(field: String, message: String): Unit = forbidOnValidation((field -> message))
 
-    def forbidOnValidation(errors: (String, String)*): Unit = forbidOnValidation((errors.map { case (f,m) => ResourceValidationError(f,m) }).toList)
+    def forbidOnValidation(errors: (String, String)*): Unit = forbidOnValidation((errors.map { case (f,m) => (f,m) }).toMap)
 
-   	def forbidOnValidation(errors: List[ResourceValidationError]): Unit = throw new ForbiddenResourceException(None, errors)
+   	def forbidOnValidation(errors: Map[String,String]): Unit = throw new ForbiddenResourceException(None, errors)
     
-    def forbidOnError(err: ErrorResponse) = throw new ForbiddenResourceException(Some(err), Nil)
+    def forbidOnError(err: ErrorResponse) = throw new ForbiddenResourceException(Some(err), Map())
     
     private def authorize(ctx: Context[T], resourceId: Option[String]): Plan.Intent = resourceId match {
         case Some(rid) => {

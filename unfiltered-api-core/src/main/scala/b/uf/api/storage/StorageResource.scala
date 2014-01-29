@@ -20,12 +20,6 @@ abstract class StorageResource[T](path: String, maxPageSize: Option[Int] = None)
         case (_,id) => storageService.find(id)
     }
     
-    override implicit def deserializeCreateReq(cr: CreateRequest)
-    	(implicit mf: Manifest[ObjectMeta[T]]): ObjectMeta[T] = {
-        // TODO finish and test
-        super.deserializeCreateReq(cr)
-    }
-    
     create {
         case (ctx) if _auth(ctx) => { _ =>
             ctx req match {
