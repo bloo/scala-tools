@@ -40,7 +40,7 @@ object Resource {
         list.reverse.foreach { case (res, plan) => cb.filter(plan) }
     }
 
-    trait LowPriorityResourceImplicits[T, R] {
+    trait LowPriorityResourceImplicits[T, R] extends b.log.Logger {
 
         def toJson(obj: Any): String = {
 	        import net.liftweb.json._
@@ -60,6 +60,8 @@ object Resource {
 	        import net.liftweb.json._
 	        import net.liftweb.json.Extraction._
 	        implicit val formats = DefaultFormats + BigDecimalSerializer // Brings in default date formats etc.
+	        if (logger.isDebugEnabled)
+	        	logger.debug("fromJson: %s" format json)
 	        extract[O](parse(json))
 	    }
 
