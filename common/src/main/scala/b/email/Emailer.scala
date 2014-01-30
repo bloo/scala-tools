@@ -35,9 +35,6 @@ trait ScalateEmailer {
 trait Emailer extends ScalateEmailer {
     this: EmailSessionFactory =>
 
-    var skipTo = false
-    var skipBcc = false
-    var skipCc = false
     var subjectPrefix: Option[String] = None
     
 	import javax.mail.internet.InternetAddress
@@ -99,17 +96,11 @@ trait Emailer extends ScalateEmailer {
 		    this
         }
         
-		def cc(cc: EmailAdr) =
-			if (!skipCc) recipient(Message.RecipientType.CC, cc)
-			else this
-		
-		def bcc(bcc: EmailAdr) =
-			if (!skipBcc) recipient(Message.RecipientType.BCC, bcc)
-			else this
+		def cc(cc: EmailAdr) = recipient(Message.RecipientType.CC, cc)
 
-		def to(to: EmailAdr) =
-			if (!skipTo) recipient(Message.RecipientType.TO, to)
-			else this
+		def bcc(bcc: EmailAdr) = recipient(Message.RecipientType.BCC, bcc)
+
+		def to(to: EmailAdr) = recipient(Message.RecipientType.TO, to)
 		
 		private def recipient(rt: Message.RecipientType, ea: EmailAdr) = {
 	    	mime.setRecipient(rt, ea)
