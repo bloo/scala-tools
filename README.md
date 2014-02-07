@@ -20,7 +20,7 @@ Basic, common utilities for use in any application.
 * __email__ easy SMTP mailer and ```javax.mail.Session``` factory
 * __errors__ application error manager that allows you to define unique error codes and messages
 * __log__ Logger trait, depends on ```slf4j```
-* __scalate__ [Scalate](http://scalate.fusesource.org/) templating engine and rendering manager, used by other utlities in this suite
+* __scalate__ [Scalate](http://scalate.fusesource.org/) templating engine and rendering manager, used by other utilities in this suite
 
 slick
 -----
@@ -37,22 +37,25 @@ unfiltered-core
 Basic set of helpers for the [unfiltered web toolkit](http://unfiltered.databinder.net/Unfiltered.html), which contains:
 * __errors__ extension of ```common.errors``` that allows for http status codes
 * __params__ common request parameter extractors
-* __scalate__ a Scalate template engine that returns unfiltered ```ResponseWriter``` instances and defines default template locations
+* __scalate__ a Scalate template engine that returns __unfiltered__ ```ResponseWriter``` instances and defines default template locations
 
 unfiltered-api-core
 ------------------
 
-The bulk of this project surrounds the ```Resource``` class, which constructs an __unfiltered__ plan that handles __RESTful__ resource definitions.
+The bulk of this project surrounds the ```Resource``` class, which constructs an __unfiltered__ plan that handles __RESTful__ resource
+definitions.
 
 unfiltered-api-auth
 -------------------
 
-An extension of __unfiltered-api-core__ that defines an authorized ```Session``` resource, for web applications that require it.
+An example of an __unfiltered-api-core__ based resource definition that describes an authorized ```Session``` resource, for web
+applications that require it.
 
 unfiltered-wro
 --------------
 
-An __unfiltered__ plan that services [WRO4J](https://github.com/alexo/wro4j) web resources. I use this to serve SASS, Coffeescript, and group together external libraries as a single resource URL.
+An __unfiltered__ plan that services [WRO4J](https://github.com/alexo/wro4j) serviced web assets. I use this to serve SASS, Coffeescript,
+and group together external libraries as a single JS or CSS URL.
 
 specs2-core
 -----------
