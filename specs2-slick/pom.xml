@@ -12,6 +12,11 @@
 
 	<artifactId>specs2-slick</artifactId>
 
+	<properties>
+		<!-- for test-only dependency -->
+		<postgresql.version>9.1-901-1.jdbc4</postgresql.version>
+	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
@@ -22,6 +27,14 @@
 			<groupId>${project.groupId}</groupId>
 			<artifactId>slick</artifactId>
 			<version>${project.version}</version>
+		</dependency>
+		
+		<!-- test only! -->
+		<dependency>
+			<groupId>postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>${postgresql.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 
