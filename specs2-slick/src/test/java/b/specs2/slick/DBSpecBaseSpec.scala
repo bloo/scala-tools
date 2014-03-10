@@ -6,7 +6,10 @@ import org.junit.runner.RunWith
 import org.specs2.runner.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class DBSpecBaseSpec extends PostgresSpecBase("testdb") {
+class DBSpecBaseSpec extends {
+	override val name: DB.Name = "specs2-slick-base-test"	
+} with PostgresSpecBase("testdb") {
+	
 	import simple._
 	case class Member(id: Long, email: String, name: Option[String])
 	class Users(tag: Tag) extends DBTable[Member](tag, "member") {

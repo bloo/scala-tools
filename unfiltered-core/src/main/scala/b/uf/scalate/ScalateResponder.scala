@@ -5,18 +5,20 @@ import unfiltered.request._
 import unfiltered.response._
 import java.io.OutputStreamWriter
 import b.scalate._
+import com.typesafe.config.ConfigFactory
 
 object ScalateResponder {
-    private var cfg: Option[ScalateEngine] = None
-    def config(debug: Boolean = false, engine: ScalateEngine = new ScalateEngine(".jade", "scalate/www", "layouts/default.jade")) = {
-        engine setDebug debug
-        ScalateResponder.cfg = Some(engine)
-    }
+	val cfg = ConfigFactory.load().getConfig("b.uf.scalate")
+	val ext = cfg getString "ext"
+	val location = cfg getString "location"
+	val layout = cfg getString "layout"
+    val engine: ScalateEngine = new ScalateEngine(ext, location, layout)
+	engine setDebug(cfg getBoolean "debug")
 }
 
 trait ScalateResponder extends b.log.Logger {
 
-    def render = ScalateResponder.cfg.get.render _
+    def render = ScalateResponder.engine.render _
     
     def global(attr: (String, Any)) = globals = globals.filter{ case (k,_) => k != attr._1 } :+ attr
     def prefix(pre: String) = pathPrefix = pre

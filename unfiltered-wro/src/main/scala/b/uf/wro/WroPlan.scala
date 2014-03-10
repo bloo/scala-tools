@@ -27,13 +27,18 @@ import ro.isdc.wro.model.resource.processor.ResourcePreProcessor
 import ro.isdc.wro.model.resource.processor.ResourcePostProcessor
 import ro.isdc.wro.util.StopWatch
 import b.log.Logger
+import com.typesafe.config.ConfigFactory
 
 object Wro {
-    var gzip = true // false
-    var debug = false
-    var cssMin = false
-    var jsMin = false
-    
+	private val CFG_BASE = "b.wro"
+	private val cfg = ConfigFactory.load().getConfig(CFG_BASE)
+	val config = new {
+	    val debug = cfg getBoolean "debug"
+	    val gzip = cfg getBoolean "gzip"
+	    val cssMin = cfg getBoolean "css.min"
+	    val jsMin = cfg getBoolean "js.min"
+	}
+	
     /**
      * order here matters..
      * classes and traits are constructed super- to sub-class, left to right
@@ -75,15 +80,12 @@ class WroPlan(file: String) extends Logger {
     def addpost[T<:ResourcePostProcessor](processor: T) = post = post :+ processor
     
 	def plan: WroFilter = new WroFilter {
-
-        Wro.jsMin = !Wro.debug
-	    Wro.cssMin = !Wro.debug
 	
 	    val wroConfig = new WroConfiguration
-	    wroConfig setDebug Wro.debug
-	    wroConfig setDisableCache Wro.debug
-	    //wroConfig.setModelUpdatePeriod(if (Wro.debug) 10 else 0)
-	    wroConfig setGzipEnabled Wro.gzip
+	    wroConfig setDebug Wro.config.debug
+	    wroConfig setDisableCache Wro.config.debug
+	    //wroConfig.setModelUpdatePeriod(if (Wro.config.debug) 10 else 0)
+	    wroConfig setGzipEnabled Wro.config.gzip
 	    wroConfig setJmxEnabled false
 	    wroConfig setIgnoreMissingResources false
 	    setConfiguration(wroConfig)
@@ -138,7 +140,7 @@ trait CssPre extends CssUrlPre { this: WroPlan =>
 }
 
 trait CssMinPost { this: WroPlan => 
-    if (Wro.cssMin) addpost(new JawrCssMinifierProcessor)
+    if (Wro.config.cssMin) addpost(new JawrCssMinifierProcessor)
 }
 
 // keeps throwing:
@@ -153,7 +155,7 @@ trait CssMinPost { this: WroPlan =>
 //}
 
 trait JsMinPost { this: WroPlan =>
-    if (Wro.jsMin) addpost(new JSMinProcessor)
+    if (Wro.config.jsMin) addpost(new JSMinProcessor)
 }
 
 trait JsPre { this: WroPlan =>
