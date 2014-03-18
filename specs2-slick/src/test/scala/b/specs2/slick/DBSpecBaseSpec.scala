@@ -12,7 +12,7 @@ class DBSpecBaseSpec extends {
 	
 	import simple._
 	case class Member(id: Long, email: String, name: Option[String])
-	class Users(tag: Tag) extends DBTable[Member](tag, "member") {
+	class Members(tag: Tag) extends DBTable[Member](tag, randomTableName) {
 		def id = column[Long]("id", O.NotNull, O.PrimaryKey)
 		def email = column[String]("email", O.NotNull)
 		def name = column[String]("name", O.Nullable)
@@ -21,12 +21,17 @@ class DBSpecBaseSpec extends {
 
 	"DBSpecBase" should {
 		"access the backend correctly" in tx { implicit s: Session =>
-			val users = TableQuery[Users]
-			users.ddl.create				
-			users += Member(1L, "foo@test.com", None)
-			users += Member(2L, "bar@baz.net", Some("Bar Smith"))
-			users.list.foreach { u => println(u) }
-			users.list.size mustEqual 2
+			val members = TableQuery[Members]
+			members.ddl.create				
+			members += Member(1L, "foo@test.com", None)
+			members += Member(2L, "bar@baz.net", Some("Bar Smith"))
+			members.list.foreach { println(_) }
+			members.list.size mustEqual 2
+		}
+		"fail to write within read-only txn" in ro { implicit s: Session =>
+			val members = TableQuery[Members]
+			//members.ddl.create must throwAn[Exception]
+			todo
 		}
 	}	
 }
