@@ -3,13 +3,13 @@ name := "unfiltered-wro"
 libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   val wro = "1.7.0"
   val sass = "3.2.1"
-  val jruby = "1.7.4"
+  val jruby = "1.7.5"
   val webjar_locator = "0.5"
   val webjar_coffeescript = "1.6.3"
   val bourbon_gem = "2.1.0"
   val rhino = "1.7R4"
   val pool = "1.6"
-  val closure = "v20130722"
+  //val closure = "v20130722"
   Seq(
   "org.mozilla" % "rhino" % rhino,
   "commons-pool" % "commons-pool" % pool,
