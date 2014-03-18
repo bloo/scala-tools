@@ -20,18 +20,14 @@ class DBSpecBaseSpec extends {
 	}
 
 	"DBSpecBase" should {
-		"access the backend correctly" in {
+		"access the backend correctly" in tx { implicit s: Session =>
 			val users = TableQuery[Users]
-			readWrite { implicit s =>
-				users.ddl.drop
-				users.ddl.create				
-			}
-			readOnly { implicit s =>
-				users += Member(1L, "foo@test.com", None)
-				users += Member(2L, "bar@baz.net", Some("Bar Smith"))
-				users.list.foreach { u => println(u) }
-				users.list.size mustEqual 2
-			}
+			users.ddl.drop
+			users.ddl.create				
+			users += Member(1L, "foo@test.com", None)
+			users += Member(2L, "bar@baz.net", Some("Bar Smith"))
+			users.list.foreach { u => println(u) }
+			users.list.size mustEqual 2
 		}
 	}	
 }

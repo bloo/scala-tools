@@ -7,10 +7,6 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
   )
 }
 
-EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.Resource
-
-EclipseKeys.withSource := true
-
 sourceManaged in Compile <<= (sourceDirectory in Compile)(_ / "resources")
 
 sourceManaged in Test <<= (sourceDirectory in Test)(_ / "resources")
