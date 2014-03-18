@@ -22,7 +22,6 @@ class DBSpecBaseSpec extends {
 	"DBSpecBase" should {
 		"access the backend correctly" in tx { implicit s: Session =>
 			val users = TableQuery[Users]
-			users.ddl.drop
 			users.ddl.create				
 			users += Member(1L, "foo@test.com", None)
 			users += Member(2L, "bar@baz.net", Some("Bar Smith"))
