@@ -5,10 +5,10 @@ import org.specs2._
 import org.specs2.specification.AroundExample
 import com.typesafe.config.ConfigFactory
 
-abstract class PostgresSpecBase(dbName: String) extends DBSpecBase(Schemes.postgresql, dbName)
-abstract class MysqlSpecBase(dbName: String) extends DBSpecBase(Schemes.mysql, dbName)
+abstract class PostgresSpecBase extends DBSpecBase(Schemes.postgresql)
+abstract class MysqlSpecBase extends DBSpecBase(Schemes.mysql)
 
-abstract class DBSpecBase(jdbcScheme: Schemes.Scheme, dbName: String)
+abstract class DBSpecBase(jdbcScheme: Schemes.Scheme)
 	extends mutable.Specification with Tx {
 
     import b.slick._
