@@ -16,7 +16,7 @@ class PostgresDBSpecBaseSpec extends {
 		def id = column[Long]("id", O.NotNull, O.PrimaryKey)
 		def email = column[String]("email", O.NotNull)
 		def name = column[String]("name", O.Nullable)
-		def * = (id, email, name?) <> (Member.tupled, Member unapply _)
+		def * = (id, email, name?) <> (Member.tupled, Member.unapply _)
 	}
 	
 	"DBSpecBase for Postgresql" should {
@@ -30,7 +30,8 @@ class PostgresDBSpecBaseSpec extends {
 		}
 		"fail to write within read-only txn" in ro { implicit s: Session =>
 			val members = TableQuery[Members]
-			members.ddl.create must throwAn[Exception]
+			members.ddl.create 
+			(members += Member(5L, "fail@test.com", None)) must throwAn[Exception]
 		}
 	}
 }
@@ -46,7 +47,7 @@ class H2DBSpecBaseSpec extends {
 		def id = column[Long]("id", O.NotNull, O.PrimaryKey)
 		def email = column[String]("email", O.NotNull)
 		def name = column[String]("name", O.Nullable)
-		def * = (id, email, name?) <> (Member.tupled, Member unapply _)
+		def * = (id, email, name?) <> (Member.tupled, Member.unapply _)
 	}
 		
 	"DBSpecBase for H2" should {
