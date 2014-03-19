@@ -16,7 +16,7 @@ class PostgresDBSpecBaseSpec extends {
 		def id = column[Long]("id", O.NotNull, O.PrimaryKey)
 		def email = column[String]("email", O.NotNull)
 		def name = column[String]("name", O.Nullable)
-		def * = (id, email, name?) <> (Member.tupled, Member _)
+		def * = (id, email, name?) <> (Member.tupled, Member unapply _)
 	}
 	
 	"DBSpecBase for Postgresql" should {
@@ -46,7 +46,7 @@ class H2DBSpecBaseSpec extends {
 		def id = column[Long]("id", O.NotNull, O.PrimaryKey)
 		def email = column[String]("email", O.NotNull)
 		def name = column[String]("name", O.Nullable)
-		def * = (id, email, name?) <> (Member.tupled, Member _)
+		def * = (id, email, name?) <> (Member.tupled, Member unapply _)
 	}
 		
 	"DBSpecBase for H2" should {
