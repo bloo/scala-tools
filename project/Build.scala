@@ -18,10 +18,10 @@ object BlooDistBuild extends Build {
 
        lazy val slick               = Project(id = "slick", base = file("slick")) dependsOn(common, specs2_core)
 
-       lazy val unfiltered_core     = Project(id = "uf-core", base = file("unfiltered-core")) dependsOn(common, specs2_core)
-       lazy val unfiltered_api_core = Project(id = "uf-api-core", base = file("unfiltered-api-core")) dependsOn(unfiltered_core)
-       lazy val unfiltered_api_auth = Project(id = "uf-api-auth", base = file("unfiltered-api-auth")) dependsOn(unfiltered_api_core) //, specs2_api) // need our own specs2-api to run tests
-       lazy val unfiltered_wro      = Project(id = "uf-wro", base = file("unfiltered-wro")) dependsOn(unfiltered_core)
+       lazy val unfiltered_core     = Project(id = "unfiltered-core", base = file("unfiltered-core")) dependsOn(common, specs2_core)
+       lazy val unfiltered_api_core = Project(id = "unfiltered-api-core", base = file("unfiltered-api-core")) dependsOn(unfiltered_core)
+       lazy val unfiltered_api_auth = Project(id = "unfiltered-api-auth", base = file("unfiltered-api-auth")) dependsOn(unfiltered_api_core) //, specs2_api) // need our own specs2-api to run tests
+       lazy val unfiltered_wro      = Project(id = "unfiltered-wro", base = file("unfiltered-wro")) dependsOn(unfiltered_core)
 
        lazy val specs2_core         = Project(id = "specs2-core", base = file("specs2-core")) dependsOn(common)
        lazy val specs2_wro          = Project(id = "specs2-wro", base = file("specs2-wro")) dependsOn(unfiltered_wro)

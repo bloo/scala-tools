@@ -30,6 +30,6 @@ object URIDataSource extends DB.DataSourceConfig with b.log.Logger {
         val min = if (cfg hasPath "min") cfg getInt "min" else 1
         val max = cfg getInt "max"
         val jdbcUrl = new URI("jdbc:%s://%s:%d%s" format (dbc.jdbcUrlScheme, host, port, uri.getPath))
-        scheme -> PooledDataSource(dbc.driverName, jdbcUrl, user, pass, min, max)
+        scheme -> PooledDataSource(dbc.driverName, jdbcUrl, Some(user), pass, min, max)
     }
 }

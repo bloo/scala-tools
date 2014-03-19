@@ -15,7 +15,7 @@ object PooledDataSource extends DB.DataSourceConfig with b.log.Logger {
     	val urlForScheme = new URI(jdbcUrl.replaceAll("jdbc:", ""))
     	val scheme = Schemes.withName(urlForScheme.getScheme)
     	val dbc = dbcFn(scheme)
-    	val user = cfg getString "jdbc.user"
+    	val user = if (cfg hasPath "jdbc.user") Some(cfg getString "jdbc.user") else None
     	val pass = if (cfg hasPath "jdbc.pass") Some(cfg getString "jdbc.pass") else None
     	val min = if (cfg hasPath "min") cfg getInt "min" else 1
     	val max = cfg getInt "max"
@@ -23,12 +23,12 @@ object PooledDataSource extends DB.DataSourceConfig with b.log.Logger {
     	scheme -> apply(dbc.driverName, url, user, pass, min, max)
     }
     
-    def apply(driverClassName: String, jdbcUrl: URI, user: String, pass: Option[String], min: Int, max: Int): DataSource = {
+    def apply(driverClassName: String, jdbcUrl: URI, user: Option[String], pass: Option[String], min: Int, max: Int): DataSource = {
         logger.info("Creating com.mchange.v2.c3p0.ComboPooledDataSource from: url=%s, user=%s, pass=***" format (jdbcUrl, user))
         val ds = new com.mchange.v2.c3p0.ComboPooledDataSource
         ds setDriverClass driverClassName
         ds setJdbcUrl jdbcUrl.toString
-        ds setUser user
+        user map { ds setUser _ }
         pass map { ds setPassword _ }
         ds setMinPoolSize min
         ds setMaxPoolSize max
