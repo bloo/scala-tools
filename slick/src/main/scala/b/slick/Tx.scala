@@ -1,51 +1,30 @@
 package b.slick
 
 import java.sql.SQLException
-
-import scala.slick.jdbc.ResultSetConcurrency
-
-
-
 import b.log.Logger
 import javax.validation.ConstraintViolationException
 
-trait Tx extends TxBase with DB
+trait Tx extends Logger with DB {
 
-
-
-trait TxBase extends Logger { this: DB =>
-
-    import java.sql.Connection
     import scala.concurrent._
     import ExecutionContext.Implicits.global
     import simple._
     
-    def readOnlyAsync[T](f: Session => T): Future[T] = future { readOnly(f) }
-    def readWriteAsync[T](f: Session => T): Future[T] = future { readWrite(f) }
-    def readWriteAsync[T](attempts: Int)(f: Session => T): Future[T] = future { readWrite(attempts)(f) }
+    def txnAsync[T](f: Session => T): Future[T] = future { txn(f) }
+    def txnAsync[T](attempts: Int)(f: Session => T): Future[T] = future { txn(attempts)(f) }
 
-    def readOnly[T](f: Session => T): T = {
-    	val s = handle.createSession().forParameters(rsConcurrency = ResultSetConcurrency.ReadOnly)
-        try f(s) finally s.close()
+    def sess[T](f: Session => T): T = handle.withSession{ s => f(s) }
+    
+    def txn[T](f: Session => T): T = sess { s => try s.withTransaction { f(s) } }
+
+    def withRollback[T](f: Session => T): T = sess { s =>
+        s.withTransaction { try f(s) finally s.rollback() }
     }
 
-    def readWrite[T](f: Session => T): T = {
-        val s = handle.createSession().forParameters(rsConcurrency = ResultSetConcurrency.Updatable)
-        try s.withTransaction { f(s) } finally s.close()
-    }
-
-    def tryThenRollback[T](f: Session => T): T = {
-        val s = handle.createSession().forParameters(rsConcurrency = ResultSetConcurrency.Updatable)
-        try s.withTransaction {
-        	try f(s)
-        	finally s.rollback()
-        } finally s.close()
-    }
-
-    def readWrite[T](attempts: Int)(f: Session => T): T = {
+    def txn[T](attempts: Int)(f: Session => T): T = {
         1 to attempts - 1 foreach { attempt =>
             try {
-                return readWrite(f)
+                return txn(f)
             } catch {
                 case cve: ConstraintViolationException => throw cve
                 case t: SQLException =>
@@ -53,6 +32,6 @@ trait TxBase extends Logger { this: DB =>
                     logger.warn(s"Failed ($throwableName) readWrite transaction attempt $attempt of $attempts")
             }
         }
-        readWrite(f)
+        txn(f)
     }
 }

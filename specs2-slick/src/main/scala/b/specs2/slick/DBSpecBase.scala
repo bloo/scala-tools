@@ -14,13 +14,7 @@ trait DBSpecBase extends mutable.Specification with Tx {
 
     object tx extends AroundOutside[Session] {
         var sess: Option[Session] = None
-    	def around[R : AsResult](a: =>R): Result = tryThenRollback {s => {sess = Some(s); AsResult(a)}}
-    	def outside: Session = sess.get
-    }
-
-    object ro extends AroundOutside[Session] {
-        var sess: Option[Session] = None
-    	def around[R : AsResult](a: =>R): Result = readOnly {s => {sess = Some(s); AsResult(a)}}
+    	def around[R : AsResult](a: =>R): Result = withRollback {s => {sess = Some(s); AsResult(a)}}
     	def outside: Session = sess.get
     }
 

@@ -28,12 +28,6 @@ class PostgresDBSpecBaseSpec extends {
 			members.list.foreach { println(_) }
 			members.list.size mustEqual 2
 		}
-		"fail to write within read-only txn" in ro { implicit s: Session =>
-//			val members = TableQuery[Members]
-//			members.ddl.create must throwAn[Exception]
-//			(members += Member(5L, "fail@test.com", None)) must throwAn[Exception]
-			skipped
-		}
 	}
 }
 

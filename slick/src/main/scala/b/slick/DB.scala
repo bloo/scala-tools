@@ -5,8 +5,8 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 import javax.sql.DataSource
 import b.log.Logger
-import b.slick.ds.URIDataSource
-import b.slick.ds.PooledDataSource
+import b.slick.ds.PooledURIDataSource
+import b.slick.ds.PooledJdbcDataSource
 
 object DB extends Logger {
 
@@ -21,14 +21,18 @@ object DB extends Logger {
 	import collection.JavaConversions._
 
 	val configured = new java.util.concurrent.atomic.AtomicBoolean(false)
-	private def config = {
-		if (configured.compareAndSet(false, true)) {
-			val cfg = ConfigFactory.load().getConfig(CFG_DB)
-			if (cfg hasPath "uri") configEach(URIDataSource, cfg getConfig "uri")
-			else if (cfg hasPath "uris") cfg.getConfigList("uris").toList.foreach { configEach(URIDataSource, _) }
-			if (cfg hasPath "pool") configEach(PooledDataSource, cfg getConfig "pool")
-			else if (cfg hasPath "pools") cfg.getConfigList("pools").toList.foreach { configEach(PooledDataSource, _) }
-		}
+	private def config = if (configured.compareAndSet(false, true)) {
+			
+		val cfg = ConfigFactory.load().getConfig(CFG_DB)
+		
+		// parse pool.uri, pool.jdbc, OR pools array
+		//
+		if (cfg hasPath "pool.uri") configEach(PooledURIDataSource, cfg getConfig "pool")
+		else if (cfg hasPath "pool.jdbc") configEach(PooledJdbcDataSource, cfg getConfig "pool")
+		else if (cfg hasPath "pools") cfg.getConfigList("pools").toList.foreach { poolCfg =>
+			if (poolCfg hasPath "uri") configEach(PooledURIDataSource, poolCfg)
+			else if (poolCfg hasPath "jdbc") configEach(PooledJdbcDataSource, poolCfg)
+		}		
 	}
 
 	def configEach[C <: DataSourceConfig](c: C, cfgObj: Config) = {
