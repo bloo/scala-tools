@@ -46,6 +46,7 @@ class H2DBSpecBaseSpec extends {
 	}
 		
 	"DBSpecBase for H2" should {
+		
 		"access an h2 db file" in tx { implicit s: Session =>
 			val members = TableQuery[Members]
 			members.ddl.create
@@ -55,6 +56,5 @@ class H2DBSpecBaseSpec extends {
 			members.list.size mustEqual 2
 		}
 	}
-	
 	
 }

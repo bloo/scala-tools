@@ -21,23 +21,28 @@ object DB extends Logger {
 	import collection.JavaConversions._
 
 	val configured = new java.util.concurrent.atomic.AtomicBoolean(false)
-	private def config = if (configured.compareAndSet(false, true)) {
+	private def config = configured.synchronized {
+		if (configured.compareAndSet(false, true)) {
 			
-		val cfg = ConfigFactory.load().getConfig(CFG_DB)
-		
-		// parse pool.uri, pool.jdbc, OR pools array
-		//
-		if (cfg hasPath "pool.uri") configEach(PooledURIDataSource, cfg getConfig "pool")
-		else if (cfg hasPath "pool.jdbc") configEach(PooledJdbcDataSource, cfg getConfig "pool")
-		else if (cfg hasPath "pools") cfg.getConfigList("pools").toList.foreach { poolCfg =>
-			if (poolCfg hasPath "uri") configEach(PooledURIDataSource, poolCfg)
-			else if (poolCfg hasPath "jdbc") configEach(PooledJdbcDataSource, poolCfg)
-		}		
+			val cfg = ConfigFactory.load().getConfig(CFG_DB)
+			
+			// parse pool.uri, pool.jdbc, OR pools array
+			//
+			if (cfg hasPath "pool.uri") configEach(PooledURIDataSource, cfg getConfig "pool")
+			else if (cfg hasPath "pool.jdbc") configEach(PooledJdbcDataSource, cfg getConfig "pool")
+			else if (cfg hasPath "pools") cfg.getConfigList("pools").toList.foreach { poolCfg =>
+				if (poolCfg hasPath "uri") configEach(PooledURIDataSource, poolCfg)
+				else if (poolCfg hasPath "jdbc") configEach(PooledJdbcDataSource, poolCfg)
+			}
+			
+			info("Configured Database names: " + _handles.keySet)
+		}
 	}
 
 	def configEach[C <: DataSourceConfig](c: C, cfgObj: Config) = {
 		val name = if (cfgObj hasPath "name") cfgObj getString "name" else "default"
-		if (_handles containsKey name) throw new Error(s"Cannot have more than one database configuration named: $name")
+		if (_handles containsKey name) throw new Error(
+			s"Cannot have more than one database configuration named: $name; taken names: " + _handles.keySet)
 		val (scheme, ds) = c.config(cfgObj) { scheme => componentForScheme(scheme) }
 		_components(name) = componentForScheme(scheme)
 		_handles(name) = scala.slick.jdbc.JdbcBackend.Database.forDataSource(ds)
@@ -56,12 +61,12 @@ object DB extends Logger {
 
 	def component(name: Name) = _components get name match {
 		case Some(comp) => comp
-		case None => throw new Error(s"No DatabaseComponent named $name")
+		case None => throw new Error(s"No DatabaseComponent named $name; available names: " + _components.keySet)
 	}
 
 	def handle(name: Name) = _handles get name match {
 		case Some(db) => db
-		case None => throw new Error(s"No Database handle named $name")
+		case None => throw new Error(s"No Database handle named $name; available names: " + _handles.keySet)
 	}
 }
 
@@ -76,7 +81,7 @@ object DB extends Logger {
 trait DB {
 
 	DB.config
-
+	
 	// import the slick driver's "query language" imports
 	//
 	val name: DB.Name = DB.CFG_DEFAULTNAME

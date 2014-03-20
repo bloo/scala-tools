@@ -10,7 +10,3 @@ libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
     "com.h2database" % "h2" % h2 % "test"
   )
 }
-
-sourceManaged in Compile <<= (sourceDirectory in Compile)(_ / "resources")
-
-sourceManaged in Test <<= (sourceDirectory in Test)(_ / "resources")
