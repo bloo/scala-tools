@@ -18,32 +18,37 @@ object DB extends Logger {
 
 	private val _handles = collection.mutable.Map.empty[Name, scala.slick.jdbc.JdbcBackend.DatabaseDef]
 	private val _components = collection.mutable.Map.empty[Name, DatabaseComponent]
+	private val _configs = collection.mutable.Map.empty[Name, DataSourceConfig]
 	import collection.JavaConversions._
 
-	val configured = new java.util.concurrent.atomic.AtomicBoolean(false)
-	private def config = configured.synchronized {
-		if (configured.compareAndSet(false, true)) {
-			
+	var configured = false
+	private def config = this.synchronized {
+		if (!configured) {
+		
 			val cfg = ConfigFactory.load().getConfig(CFG_DB)
 			
 			// parse pool.uri, pool.jdbc, OR pools array
 			//
-			if (cfg hasPath "pool.uri") configEach(PooledURIDataSource, cfg getConfig "pool")
-			else if (cfg hasPath "pool.jdbc") configEach(PooledJdbcDataSource, cfg getConfig "pool")
+			if (cfg hasPath "pool.uri") configEach(new PooledURIDataSource, cfg getConfig "pool")
+			else if (cfg hasPath "pool.jdbc") configEach(new PooledJdbcDataSource, cfg getConfig "pool")
 			else if (cfg hasPath "pools") cfg.getConfigList("pools").toList.foreach { poolCfg =>
-				if (poolCfg hasPath "uri") configEach(PooledURIDataSource, poolCfg)
-				else if (poolCfg hasPath "jdbc") configEach(PooledJdbcDataSource, poolCfg)
+				if (poolCfg hasPath "uri") configEach(new PooledURIDataSource, poolCfg)
+				else if (poolCfg hasPath "jdbc") configEach(new PooledJdbcDataSource, poolCfg)
 			}
 			
 			info("Configured Database names: " + _handles.keySet)
+			configured = true
 		}
 	}
+	
+	def shutdown = _configs.values.foreach { _.shutdown }
 
 	def configEach[C <: DataSourceConfig](c: C, cfgObj: Config) = {
 		val name = if (cfgObj hasPath "name") cfgObj getString "name" else "default"
 		if (_handles containsKey name) throw new Error(
 			s"Cannot have more than one database configuration named: $name; taken names: " + _handles.keySet)
-		val (scheme, ds) = c.config(cfgObj) { scheme => componentForScheme(scheme) }
+		val (scheme, ds) = c.init(cfgObj) { scheme => componentForScheme(scheme) }
+		_configs(name) = c
 		_components(name) = componentForScheme(scheme)
 		_handles(name) = scala.slick.jdbc.JdbcBackend.Database.forDataSource(ds)
 	}
@@ -55,8 +60,9 @@ object DB extends Logger {
 		case other => throw new Error(s"No DatabaseComponent for scheme $other")
 	}
 
-	trait DataSourceConfig {
-		def config(cfg: Config)(schemaFn: Scheme => DatabaseComponent): (Schemes.Scheme, DataSource)
+	abstract class DataSourceConfig {
+		def init(cfg: Config)(schemaFn: Scheme => DatabaseComponent): (Scheme, DataSource)
+		def shutdown
 	}
 
 	def component(name: Name) = _components get name match {

@@ -18,9 +18,11 @@ import b.slick.Schemes
  * --------+++--------------+----------+-----------------------------------------+----/--------------
  * postgres://ymhoznyjspdouz:By3wzE3bku@ec2-55-111-999-77.compute-1.amazonaws.com:5432/fdcgv1k7irje8a
  */
-object PooledURIDataSource extends DB.DataSourceConfig with b.log.Logger {
+class PooledURIDataSource extends DB.DataSourceConfig with b.log.Logger {
 
-    def config(cfg: Config)(dbcFn: Schemes.Scheme => DatabaseComponent) = {
+	val pds = new PooledJdbcDataSource()
+
+    def init(cfg: Config)(dbcFn: Schemes.Scheme => DatabaseComponent) = {
     	val uri = new URI(cfg getString "uri")
     	val scheme = Schemes.withName(uri.getScheme)
     	val dbc = dbcFn(scheme)
@@ -32,6 +34,8 @@ object PooledURIDataSource extends DB.DataSourceConfig with b.log.Logger {
         val min = if (cfg hasPath "min") Some(cfg getInt "min") else None
         val max = cfg getInt "max"
         val jdbcUrl = new URI("jdbc:%s://%s:%d%s" format (dbc.jdbcUrlScheme, host, port, uri.getPath))
-        scheme -> PooledJdbcDataSource(dbc.driverName, jdbcUrl, Some(user), pass, min, max)
+        scheme -> pds.init(dbc.driverName, jdbcUrl, Some(user), pass, min, max)
     }
+	
+	def shutdown = pds.shutdown
 }

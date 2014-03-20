@@ -2,11 +2,11 @@ package b.specs2.slick
 
 import b.slick._
 import org.specs2._
-import org.specs2.specification.AroundExample
+import org.specs2.specification.After
 import com.typesafe.config.ConfigFactory
 import java.util.UUID
 
-trait DBSpecBase extends mutable.Specification with Tx {
+trait DBSpecBase extends mutable.Specification with Tx with After {
 
     import b.slick._
     import org.specs2.specification.{AroundOutside,Around}
@@ -18,5 +18,7 @@ trait DBSpecBase extends mutable.Specification with Tx {
     	def outside: Session = sess.get
     }
 
+    def after = DB.shutdown
+    
     def randomTableName = "tbl-" + UUID.randomUUID().toString().replaceAll("-", "")
 }
