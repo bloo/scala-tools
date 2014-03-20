@@ -8,4 +8,5 @@ addon:
   postgresql: "9.3"
 before_script:
   - psql -c "create database testdb;" -U postgres
-  - mysql -e "create database test;"
+  - mysql -e "create database test;" -u root
+
