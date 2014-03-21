@@ -6,7 +6,7 @@ import org.specs2.specification.After
 import com.typesafe.config.ConfigFactory
 import java.util.UUID
 
-trait DBSpecBase extends mutable.Specification with Tx with After {
+trait DBSpecBase extends mutable.Specification with Txn with After {
 
     import b.slick._
     import org.specs2.specification.{AroundOutside,Around}

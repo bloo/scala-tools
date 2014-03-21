@@ -4,7 +4,7 @@ import java.sql.SQLException
 import b.log.Logger
 import javax.validation.ConstraintViolationException
 
-trait Tx extends Logger with DB {
+trait Txn extends Logger with DB {
 
     import scala.concurrent._
     import ExecutionContext.Implicits.global
