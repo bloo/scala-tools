@@ -9,8 +9,8 @@ import b.slick.Schemes
 
 class PooledJdbcDataSource extends DB.DataSourceConfig with b.log.Logger {
 
-	val ds = new com.mchange.v2.c3p0.ComboPooledDataSource
-	    
+	val ds = new org.apache.commons.dbcp2.BasicDataSource()
+	
     def init(cfg: Config)(dbcFn: Schemes.Scheme => DatabaseComponent) = {
     	info(cfg.root().render())
     	val jdbcUrl = cfg getString "jdbc.url"
@@ -26,21 +26,16 @@ class PooledJdbcDataSource extends DB.DataSourceConfig with b.log.Logger {
     }
     
     def init(driverClassName: String, jdbcUrl: URI, user: Option[String], pass: Option[String], min: Option[Int], max: Int): DataSource = {
-        logger.info("Creating com.mchange.v2.c3p0.ComboPooledDataSource from: url=%s, user=%s, pass=***" format (jdbcUrl, user))
-        ds setDriverClass driverClassName
-        ds setJdbcUrl jdbcUrl.toString
-        user map { ds setUser _ }
+        logger.info(s"$ds.className from: url=$jdbcUrl, user=$user, pass=***")
+        user map { ds setUsername _ }
         pass map { ds setPassword _ }
-        val realMin = min match {
+        ds setUrl jdbcUrl.toString
+        ds setDriverClassName driverClassName
+        ds setMaxTotal max
+        ds setMinIdle (min match {
         	case Some(m) => m
         	case None => 1
-        }
-        ds setMinPoolSize realMin
-        ds setInitialPoolSize realMin
-        ds setMaxPoolSize max
-        ds setMaxStatements (max*10)
-        ds setMaxStatementsPerConnection 10 
-        //ds.setNumHelperThreads(10)
+        })
         ds
     }
     
