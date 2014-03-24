@@ -1,7 +1,7 @@
 name := "unfiltered-wro"
 
 libraryDependencies <<= (version, scalaVersion) { (v, sv) =>
-  val wro = "1.7.0"
+  val wro = "1.7.4"
   val sass = "3.2.1"
   val jruby = "1.7.5"
   val webjar_locator = "0.5"

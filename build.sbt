@@ -11,7 +11,8 @@ resolvers in ThisBuild ++= Seq(
   //"internal-m2" at "http://dl.dropbox.com/u/8678549/mvn-repos"
 )
 
-publishTo in ThisBuild := Some(Resolver.file("file",  new File( "/Users/bloo/Dropbox/Public/ivy-repos" )) )
+publishTo in ThisBuild := Some(Resolver.file("file",
+  new File( "/Users/bloo/Dropbox/Public/ivy-repos")))
 
 shellPrompt in ThisBuild := { state => Project.extract(state).currentRef.project + "> " }
 
