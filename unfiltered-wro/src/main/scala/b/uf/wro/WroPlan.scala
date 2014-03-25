@@ -14,7 +14,8 @@ import ro.isdc.wro.extensions.processor.css.BourbonCssProcessor
 import ro.isdc.wro.extensions.processor.js.CoffeeScriptProcessor
 import ro.isdc.wro.extensions.processor.support.sass.RubySassEngine
 import ro.isdc.wro.http.WroFilter
-import ro.isdc.wro.manager.factory.ConfigurableWroManagerFactory
+import ro.isdc.wro.model.factory.WroModelFactory
+import ro.isdc.wro.manager.factory.{WroManagerFactory, ConfigurableWroManagerFactory}
 import ro.isdc.wro.model.resource.processor.factory.ProcessorsFactory
 import ro.isdc.wro.model.resource.processor.factory.SimpleProcessorsFactory
 import ro.isdc.wro.model.resource.processor.impl.css.CssImportPreProcessor
@@ -37,6 +38,7 @@ object Wro {
 	    val gzip = cfg getBoolean "gzip"
 	    val cssMin = cfg getBoolean "css.min"
 	    val jsMin = cfg getBoolean "js.min"
+	    val base = cfg getString "base"
 	}
 	
     /**
@@ -67,6 +69,34 @@ object Wro {
 
     // aggregate js and css only - no pre or post processing
     def aggOnlyPlan(wroXml: String) = new WroPlan(wroXml) plan
+    
+    import javax.servlet.FilterConfig
+	import javax.servlet.http.HttpServletRequest
+	import javax.servlet.http.HttpServletResponse
+	import org.mockito.Mockito
+	import ro.isdc.wro.config.Context
+	import ro.isdc.wro.config.jmx.WroConfiguration
+	import ro.isdc.wro.http.WroFilter
+	import ro.isdc.wro.model.resource.ResourceType
+	import scala.collection.JavaConversions._
+
+	def planner(http: unfiltered.jetty.Http, resources: (String, WroFilter)*): Seq[String] = resources flatMap {
+		case (ctx, plan) => {
+
+			http.context(ctx)(_ filter plan)
+
+			// mocks to set wro context.. god i hate this library
+			val request = Mockito.mock(classOf[HttpServletRequest])
+			val response = Mockito.mock(classOf[HttpServletResponse])
+			val fConfig = Mockito.mock(classOf[FilterConfig])
+			val config = new WroConfiguration()
+			Context.set(Context.webContext(request, response, fConfig), config)
+
+			plan.getWroManagerFactory().create().getModelFactory().create().getGroups().toSeq flatMap { group =>
+				ResourceType.values().toSeq map { ext => ctx + "/" + group.getName() + "." + ext.name().toLowerCase() }
+			}
+		}
+	}
 }
 
 class WroPlan(file: String) extends Logger {
@@ -79,8 +109,7 @@ class WroPlan(file: String) extends Logger {
     def addpre[T<:ResourcePreProcessor](processor: T) = pre = pre :+ processor
     def addpost[T<:ResourcePostProcessor](processor: T) = post = post :+ processor
     
-	def plan: WroFilter = new WroFilter {
-	
+	def plan = new WroFilter {
 	    val wroConfig = new WroConfiguration
 	    wroConfig setDebug Wro.config.debug
 	    wroConfig setDisableCache Wro.config.debug
@@ -99,9 +128,7 @@ class WroPlan(file: String) extends Logger {
 	
         //ro.isdc.wro.maven.plugin.manager.factory.ConfigurableWroManagerFactory
 	    val factory = new ConfigurableWroManagerFactory {
-	
 	        setProcessorsFactory(spf)
-	
 	        override def newModelFactory = {
 	            new SmartWroModelFactory {
 	            	setAutoDetectWroFile(false)

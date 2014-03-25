@@ -10,3 +10,5 @@ rebel.xml
 *~
 .DS_Store
 velocity.log
+.idea
+.idea_modules
