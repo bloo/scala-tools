@@ -9,7 +9,7 @@ case class EmailAdr(
 
 object EmailAdr {
 	def apply(email: String, fn: String, ln: String): EmailAdr = {
-		EmailAdr(email, Some("%s %s" format (fn, ln)))
+		EmailAdr(email, Some(s"$fn $ln"))
 	}
 }
 

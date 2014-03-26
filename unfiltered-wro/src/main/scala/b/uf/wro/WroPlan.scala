@@ -38,8 +38,11 @@ object Wro {
 	    val gzip = cfg getBoolean "gzip"
 	    val cssMin = cfg getBoolean "css.min"
 	    val jsMin = cfg getBoolean "js.min"
-	    val base = cfg getString "base"
+	    val hostedUrl = cfg getString "hostedUrl"
 	}
+}
+
+object WroPlans {
 	
     /**
      * order here matters..
@@ -47,28 +50,28 @@ object Wro {
      */
     
     // aggregate, pre- and post-process and minify CSS
-    def libCssPlan(wroXml: String) = new WroPlan(wroXml) with CssPre with CssMinPost plan
+    def libCssPlan(wroXml: File) = new WroPlan(wroXml) with CssPre with CssMinPost plan
     
     // aggregate, pre- and post-process and minify JS
-    def libJsPlan(wroXml: String) = new WroPlan(wroXml) with JsPre with JsMinPost plan
+    def libJsPlan(wroXml: File) = new WroPlan(wroXml) with JsPre with JsMinPost plan
     
     // aggregate, pre- and post-process and minify JS *AND* CSS resources
-    def libAppPlan(wroXml: String) = new WroPlan(wroXml) with CssPre with CssMinPost with JsPre with JsMinPost plan
+    def libAppPlan(wroXml: File) = new WroPlan(wroXml) with CssPre with CssMinPost with JsPre with JsMinPost plan
     
     // process CoffeeScript resources into JS
-    def coffeePlan(wroXml: String) = new WroPlan(wroXml) with CoffeeScript with JsMinPost plan
+    def coffeePlan(wroXml: File) = new WroPlan(wroXml) with CoffeeScript with JsMinPost plan
 
     // process SCSS resources into CSS
-    def scssPlan(wroXml: String) = new WroPlan(wroXml) with Scss with CssMinPost plan
+    def scssPlan(wroXml: File) = new WroPlan(wroXml) with Scss with CssMinPost plan
     
     // process SASS resources into CSS
-    def sassPlan(wroXml: String) = new WroPlan(wroXml) with Sass with CssMinPost plan
+    def sassPlan(wroXml: File) = new WroPlan(wroXml) with Sass with CssMinPost plan
     
     // "application" plan that processes and minifies CoffeeScript and SASS
-    def appPlan(wroXml: String) = new WroPlan(wroXml) with CoffeeScript with Sass with JsMinPost with CssMinPost plan
+    def appPlan(wroXml: File) = new WroPlan(wroXml) with CoffeeScript with Sass with JsMinPost with CssMinPost plan
 
     // aggregate js and css only - no pre or post processing
-    def aggOnlyPlan(wroXml: String) = new WroPlan(wroXml) plan
+    def aggOnlyPlan(wroXml: File) = new WroPlan(wroXml) plan
     
     import javax.servlet.FilterConfig
 	import javax.servlet.http.HttpServletRequest
@@ -99,7 +102,7 @@ object Wro {
 	}
 }
 
-class WroPlan(file: String) extends Logger {
+class WroPlan(file: File) extends Logger {
 
     logger info ("Building WRO plan for: %s" format file)
     
@@ -132,7 +135,7 @@ class WroPlan(file: String) extends Logger {
 	        override def newModelFactory = {
 	            new SmartWroModelFactory {
 	            	setAutoDetectWroFile(false)
-	                setWroFile(new File(file))
+	                setWroFile(file)
 	            }
 	        }
 	    }
