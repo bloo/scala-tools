@@ -29,11 +29,22 @@ import ro.isdc.wro.model.resource.processor.ResourcePostProcessor
 import ro.isdc.wro.util.StopWatch
 import b.log.Logger
 import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
 
-object Wro {
-	private val CFG_BASE = "b.wro"
-	private val cfg = ConfigFactory.load().getConfig(CFG_BASE)
-	val config = new {
+object Wro extends b.log.Logger {
+
+	private var _cfg: Option[Config] = None
+
+	def config(c: Config) = _cfg = Some(c.getConfig("b.wro"))
+	def cfg: Config = _cfg match {
+		case Some(c) => c
+		case None => {
+			config(ConfigFactory.load())
+			cfg
+		}
+	}
+
+	lazy val config = new {
 	    val debug = cfg getBoolean "debug"
 	    val gzip = cfg getBoolean "gzip"
 	    val cssMin = cfg getBoolean "css.min"

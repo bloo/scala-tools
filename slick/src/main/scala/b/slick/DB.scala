@@ -1,19 +1,30 @@
 package b.slick
 
 import org.joda.time.DateTimeZone
-import com.typesafe.config.ConfigFactory
+
 import com.typesafe.config.Config
-import javax.sql.DataSource
+import com.typesafe.config.ConfigFactory
+
 import b.log.Logger
-import b.slick.ds.PooledURIDataSource
 import b.slick.ds.PooledJdbcDataSource
+import b.slick.ds.PooledURIDataSource
+import javax.sql.DataSource
 
 object DB extends Logger {
 
 	type Name = String
 	import Schemes._
 
-	val CFG_DB = "b.database"
+	private var _cfg: Option[Config] = None
+	def config(c: Config) = _cfg = Some(c getConfig "b.database")
+	def cfg: Config = _cfg match {
+		case Some(c) => c
+		case None => {
+			config(ConfigFactory.load())
+			cfg
+		}
+	}
+	
 	val CFG_DEFAULTNAME: Name = "default"
 
 	private val _handles = collection.mutable.Map.empty[Name, scala.slick.jdbc.JdbcBackend.DatabaseDef]
@@ -25,8 +36,6 @@ object DB extends Logger {
 	private def config = this.synchronized {
 		if (!configured) {
 		
-			val cfg = ConfigFactory.load().getConfig(CFG_DB)
-			
 			// parse pool.uri, pool.jdbc, OR pools array
 			//
 			if (cfg hasPath "pool.uri") configEach(new PooledURIDataSource, cfg getConfig "pool")

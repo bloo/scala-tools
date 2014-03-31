@@ -2,6 +2,7 @@ package b.email
 
 import b.scalate._
 import java.util.Properties
+import com.typesafe.config.Config
 
 case class EmailAdr(
     email: String,
@@ -21,8 +22,8 @@ case class MessageContext(
 
 object ScalateEmailer {
     private var cfg: Option[ScalateEngine] = None
-    def config(debug: Boolean = false, engine: ScalateEngine = new ScalateEngine(".jade", "scalate/email", "layouts/default.jade")) = {
-        engine setDebug debug
+    def config(c: Config, engine: ScalateEngine = new ScalateEngine(".jade", "scalate/email", "layouts/default.jade")) = {
+        engine.debug(c getBoolean "b.email.scalate.debug")
         ScalateEmailer.cfg = Some(engine)
     }
 }

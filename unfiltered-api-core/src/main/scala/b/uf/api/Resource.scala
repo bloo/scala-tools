@@ -15,12 +15,9 @@ import unfiltered.response._
 import unfiltered.response.ResponseString
 import unfiltered.response.Unauthorized
 import b.uf.errors._
-
-/**
- * A helper that will JSON serialize BigDecimal
- */
 import net.liftweb.json._
 import unfiltered.filter.request.ContextPath
+import com.typesafe.config.Config
 
 case class Context[T](resourcePath: String, req: HttpRequest[_], auth: Option[T], pathIds: Map[String, String]) {
     def hasAuth = !auth.isEmpty
@@ -31,7 +28,9 @@ case class QueryResultGroup[R](val group: List[R])
 
 object Resource {
 
-	var prettyJson = false
+	def config(c: Config) = prettyJson = c getBoolean "b.uf.resource.pretty"
+	
+	private var prettyJson = false
 
     def apply[T](group: String, version: Double, cb: unfiltered.jetty.ContextBuilder)(resources: Resource[T, _]*) = {
         val list = resources map { res => (res -> res.plan(group, version)) } sortBy {

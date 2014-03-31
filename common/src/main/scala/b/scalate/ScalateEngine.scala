@@ -8,18 +8,19 @@ import org.fusesource.scalate.Binding
 import java.io.Writer
 import java.io.PrintWriter
 import java.io.File
+import com.typesafe.config.Config
 
 
 object ScalateEngine {
     type ToRenderContext = (String, PrintWriter, TemplateEngine) => RenderContext
 }
 
-class ScalateEngine(templateExt: String, templatePath: String, layoutTemplate: String) extends b.log.Logger {
+class ScalateEngine(templateExt: String, templatePath: String, layoutTemplate: String, debug: Boolean = false) extends b.log.Logger {
     private val engine = new TemplateEngine
     engine.layoutStrategy = new DefaultLayoutStrategy(engine, templatePath + "/" + layoutTemplate)
     private val renderContext: ScalateEngine.ToRenderContext = (path, writer, engine) => new DefaultRenderContext(path, engine, writer)
 
-    def setDebug(debug: Boolean) = {
+    def debug(debug: Boolean) = {
         engine.allowCaching = !debug
         engine.allowReload = debug
         engine.mode = if (debug) "development" else "production"

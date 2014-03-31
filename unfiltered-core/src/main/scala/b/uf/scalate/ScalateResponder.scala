@@ -6,14 +6,23 @@ import unfiltered.response._
 import java.io.OutputStreamWriter
 import b.scalate._
 import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
 
 object ScalateResponder {
-	val cfg = ConfigFactory.load().getConfig("b.uf.scalate")
-	val ext = cfg getString "ext"
-	val location = cfg getString "location"
-	val layout = cfg getString "layout"
-    val engine: ScalateEngine = new ScalateEngine(ext, location, layout)
-	engine setDebug(cfg getBoolean "debug")
+	
+	private var _cfg: Option[Config] = None
+	def config(c: Config) = _cfg = Some(c getConfig "b.uf.scalate")
+
+	def cfg = _cfg get
+	
+	lazy val ext = cfg getString "ext"
+	lazy val location = cfg getString "location"
+	lazy val layout = cfg getString "layout"
+    lazy val engine: ScalateEngine = {
+		val e = new ScalateEngine(ext, location, layout)
+		e debug(cfg getBoolean "debug")
+		e
+	}
 }
 
 trait ScalateResponder extends b.log.Logger {

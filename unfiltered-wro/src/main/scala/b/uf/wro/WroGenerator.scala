@@ -9,7 +9,12 @@ object WroGenerator extends b.log.Logger {
 		generate(new File(outputDir), resources:_*)
 
 	def generate(outputDir: File, resources: (String, WroFilter)*): Seq[File] = {
-
+		val cl = ClassLoader.getSystemClassLoader()
+		generate(cl, outputDir, resources:_*)
+	}
+	
+	def generate(cl: ClassLoader, outputDir: File, resources: (String, WroFilter)*): Seq[File] = {
+		
 		val generator = unfiltered.jetty.Http(unfiltered.util.Port.any)
 		val paths = WroPlans.planner(generator, resources:_*)
 
