@@ -8,12 +8,9 @@ import b.scalate._
 import com.typesafe.config.ConfigFactory
 import com.typesafe.config.Config
 
-object ScalateResponder {
+object ScalateResponder extends b.config.Conf {
 	
-	private var _cfg: Option[Config] = None
-	def config(c: Config) = _cfg = Some(c getConfig "b.uf.scalate")
-
-	def cfg = _cfg get
+	val configRoot = Some("b.uf.scalate")
 	
 	lazy val ext = cfg getString "ext"
 	lazy val location = cfg getString "location"

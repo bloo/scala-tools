@@ -1,0 +1,2 @@
+
+alert 'goodbye, cruel world!'

@@ -2,192 +2,166 @@
 package b.uf.wro
 
 import java.io.File
+import java.io.FileInputStream
+import java.io.InputStream
 import java.io.PrintWriter
 import java.io.StringWriter
+
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.Validate
+
+import b.log.Logger
 import javax.script.ScriptEngine
 import javax.script.ScriptEngineManager
 import ro.isdc.wro.config.jmx.WroConfiguration
-import ro.isdc.wro.extensions.model.factory.SmartWroModelFactory
 import ro.isdc.wro.extensions.processor.css.BourbonCssProcessor
 import ro.isdc.wro.extensions.processor.js.CoffeeScriptProcessor
 import ro.isdc.wro.extensions.processor.support.sass.RubySassEngine
 import ro.isdc.wro.http.WroFilter
-import ro.isdc.wro.model.factory.WroModelFactory
-import ro.isdc.wro.manager.factory.{WroManagerFactory, ConfigurableWroManagerFactory}
-import ro.isdc.wro.model.resource.processor.factory.ProcessorsFactory
+import ro.isdc.wro.manager.factory.BaseWroManagerFactory
+import ro.isdc.wro.model.factory.XmlModelFactory
+import ro.isdc.wro.model.resource.processor.ResourcePostProcessor
+import ro.isdc.wro.model.resource.processor.ResourcePreProcessor
 import ro.isdc.wro.model.resource.processor.factory.SimpleProcessorsFactory
 import ro.isdc.wro.model.resource.processor.impl.css.CssImportPreProcessor
-import ro.isdc.wro.model.resource.processor.impl.css.CssUrlRewritingProcessor
 import ro.isdc.wro.model.resource.processor.impl.css.CssVariablesProcessor
 import ro.isdc.wro.model.resource.processor.impl.css.JawrCssMinifierProcessor
 import ro.isdc.wro.model.resource.processor.impl.js.JSMinProcessor
 import ro.isdc.wro.model.resource.processor.impl.js.SemicolonAppenderPreProcessor
-import ro.isdc.wro.model.resource.processor.ResourcePreProcessor
-import ro.isdc.wro.model.resource.processor.ResourcePostProcessor
 import ro.isdc.wro.util.StopWatch
-import b.log.Logger
-import com.typesafe.config.ConfigFactory
-import com.typesafe.config.Config
 
-object Wro extends b.log.Logger {
+object Wro extends b.log.Logger with b.config.Conf {
 
-	private var _cfg: Option[Config] = None
+	val configRoot = Some("b.wro")
 
-	def config(c: Config) = _cfg = Some(c.getConfig("b.wro"))
-	def cfg: Config = _cfg match {
-		case Some(c) => c
-		case None => {
-			config(ConfigFactory.load())
-			cfg
-		}
-	}
-
-	lazy val config = new {
-	    val debug = cfg getBoolean "debug"
-	    val gzip = cfg getBoolean "gzip"
-	    val cssMin = cfg getBoolean "css.min"
-	    val jsMin = cfg getBoolean "js.min"
-	    val hostedUrl = cfg getString "hostedUrl"
-	}
+	lazy val debug = cfg getBoolean "debug"
+	lazy val gzip = cfg getBoolean "gzip"
+	lazy val hostedUrl = cfg getString "hostedUrl"
 }
 
 object WroPlans {
-	
-    /**
-     * order here matters..
-     * classes and traits are constructed super- to sub-class, left to right
-     */
-    
-    // aggregate, pre- and post-process and minify CSS
-    def libCssPlan(wroXml: File) = new WroPlan(wroXml) with CssPre with CssMinPost plan
-    
-    // aggregate, pre- and post-process and minify JS
-    def libJsPlan(wroXml: File) = new WroPlan(wroXml) with JsPre with JsMinPost plan
-    
-    // aggregate, pre- and post-process and minify JS *AND* CSS resources
-    def libAppPlan(wroXml: File) = new WroPlan(wroXml) with CssPre with CssMinPost with JsPre with JsMinPost plan
-    
-    // process CoffeeScript resources into JS
-    def coffeePlan(wroXml: File) = new WroPlan(wroXml) with CoffeeScript with JsMinPost plan
 
-    // process SCSS resources into CSS
-    def scssPlan(wroXml: File) = new WroPlan(wroXml) with Scss with CssMinPost plan
-    
-    // process SASS resources into CSS
-    def sassPlan(wroXml: File) = new WroPlan(wroXml) with Sass with CssMinPost plan
-    
-    // "application" plan that processes and minifies CoffeeScript and SASS
-    def appPlan(wroXml: File) = new WroPlan(wroXml) with CoffeeScript with Sass with JsMinPost with CssMinPost plan
+	/**
+	 * order here matters..
+	 * classes and traits are constructed super- to sub-class, left to right
+	 */
 
-    // aggregate js and css only - no pre or post processing
-    def aggOnlyPlan(wroXml: File) = new WroPlan(wroXml) plan
-    
-    import javax.servlet.FilterConfig
-	import javax.servlet.http.HttpServletRequest
-	import javax.servlet.http.HttpServletResponse
-	import org.mockito.Mockito
-	import ro.isdc.wro.config.Context
-	import ro.isdc.wro.config.jmx.WroConfiguration
-	import ro.isdc.wro.http.WroFilter
-	import ro.isdc.wro.model.resource.ResourceType
-	import scala.collection.JavaConversions._
+	// aggregate, pre- and post-process and minify CSS
+	def libCssPlan(wroXml: File) = new WroPlan(wroXml) with CssPre with CssMinPost plan
 
-	def planner(http: unfiltered.jetty.Http, resources: (String, WroFilter)*): Seq[String] = resources flatMap {
-		case (ctx, plan) => {
+	// aggregate, pre- and post-process and minify JS
+	def libJsPlan(wroXml: File) = new WroPlan(wroXml) with JsPre with JsMinPost plan
 
-			http.context(ctx)(_ filter plan)
+	// aggregate, pre- and post-process and minify JS *AND* CSS resources
+	def libAppPlan(wroXml: File) = new WroPlan(wroXml) with CssPre with CssMinPost with JsPre with JsMinPost plan
 
-			// mocks to set wro context.. god i hate this library
-			val request = Mockito.mock(classOf[HttpServletRequest])
-			val response = Mockito.mock(classOf[HttpServletResponse])
-			val fConfig = Mockito.mock(classOf[FilterConfig])
-			val config = new WroConfiguration()
-			Context.set(Context.webContext(request, response, fConfig), config)
+	// process CoffeeScript resources into JS
+	def coffeePlan(wroXml: File) = new WroPlan(wroXml) with CoffeeScript with JsMinPost plan
 
-			plan.getWroManagerFactory().create().getModelFactory().create().getGroups().toSeq flatMap { group =>
-				ResourceType.values().toSeq map { ext => ctx + "/" + group.getName() + "." + ext.name().toLowerCase() }
-			}
-		}
+	// process SCSS resources into CSS
+	def scssPlan(wroXml: File) = new WroPlan(wroXml) with Scss with CssMinPost plan
+
+	// process SASS resources into CSS
+	def sassPlan(wroXml: File) = new WroPlan(wroXml) with Sass with CssMinPost plan
+
+	// "application" plan that processes and minifies CoffeeScript and SASS
+	def appPlan(wroXml: File) = new WroPlan(wroXml) with CoffeeScript with Sass with JsMinPost with CssMinPost plan
+
+	// aggregate js and css only - no pre or post processing
+	def aggOnlyPlan(wroXml: File) = new WroPlan(wroXml) plan
+
+	def planner(http: unfiltered.jetty.Http, resources: (String, WroFilter)*) = resources foreach {
+		case (ctx, plan) => http.context(ctx)(_ filter plan)
 	}
 }
 
 class WroPlan(file: File) extends Logger {
 
-    logger info ("Building WRO plan for: %s" format file)
-    
-    private var pre = scala.collection.mutable.LinkedList[ResourcePreProcessor]()
-    private var post = scala.collection.mutable.LinkedList[ResourcePostProcessor]()
-	
-    def addpre[T<:ResourcePreProcessor](processor: T) = pre = pre :+ processor
-    def addpost[T<:ResourcePostProcessor](processor: T) = post = post :+ processor
-    
-	def plan = new WroFilter {
-	    val wroConfig = new WroConfiguration
-	    wroConfig setDebug Wro.config.debug
-	    wroConfig setDisableCache Wro.config.debug
-	    //wroConfig.setModelUpdatePeriod(if (Wro.config.debug) 10 else 0)
-	    wroConfig setGzipEnabled Wro.config.gzip
-	    wroConfig setJmxEnabled false
-	    wroConfig setIgnoreMissingResources false
-	    setConfiguration(wroConfig)
+	logger info ("Building WRO plan for: %s" format file)
 
-	    val spf = new SimpleProcessorsFactory {
-	        logger info ("[%d] pre-processors for %s" format(pre.size, file))
-	        logger info ("[%d] post-processors for %s" format(post.size, file))
-	        for (p <- pre) addPreProcessor(p)
-	        for (p <- post) addPostProcessor(p)
-	    }
-	
-        //ro.isdc.wro.maven.plugin.manager.factory.ConfigurableWroManagerFactory
-	    val factory = new ConfigurableWroManagerFactory {
-	        setProcessorsFactory(spf)
-	        override def newModelFactory = {
-	            new SmartWroModelFactory {
-	            	setAutoDetectWroFile(false)
-	                setWroFile(file)
-	            }
-	        }
-	    }
-	    
-	    setWroManagerFactory(factory)
-    }
+	private var pre = scala.collection.mutable.LinkedList[ResourcePreProcessor]()
+	private var post = scala.collection.mutable.LinkedList[ResourcePostProcessor]()
+
+	def addpre[T <: ResourcePreProcessor](processor: T) = pre = pre :+ processor
+	def addpost[T <: ResourcePostProcessor](processor: T) = post = post :+ processor
+
+	def plan = new WroFilter {
+		val wroConfig = new WroConfiguration
+		wroConfig setDebug Wro.debug
+		wroConfig setDisableCache Wro.debug
+		//wroConfig.setModelUpdatePeriod(if (Wro.debug) 10 else 0)
+		wroConfig setGzipEnabled Wro.gzip
+		wroConfig setJmxEnabled false
+		wroConfig setIgnoreMissingResources false
+		setConfiguration(wroConfig)
+
+		val spf = new SimpleProcessorsFactory {
+			logger info ("[%d] pre-processors for %s" format (pre.size, file))
+			logger info ("[%d] post-processors for %s" format (post.size, file))
+			for (p <- pre) addPreProcessor(p)
+			for (p <- post) addPostProcessor(p)
+		}
+
+		//ro.isdc.wro.maven.plugin.manager.factory.ConfigurableWroManagerFactory
+		//	    val factory = new ConfigurableWroManagerFactory {
+		//	        setProcessorsFactory(spf)
+		//	        override def newModelFactory = {
+		//	            new SmartWroModelFactory {
+		//	            	setAutoDetectWroFile(false)
+		//	                setWroFile(file)
+		//	            }
+		//	        }
+		//	    }
+
+		val factory = new BaseWroManagerFactory {
+			setProcessorsFactory(spf)
+			setModelFactory(new XmlModelFactory {
+				override protected def getModelResourceAsStream: InputStream = {
+					new FileInputStream(file)
+				}
+			})
+//			def create = {
+//				
+//			}
+		}
+
+		setWroManagerFactory(factory)
+	}
 }
 
 trait CoffeeScript { this: WroPlan =>
-    addpost(new CoffeeScriptProcessor)
+	addpost(new CoffeeScriptProcessor)
 }
 
 trait Sass extends CssUrlPre { this: WroPlan =>
-    addpost(new BourbonCssProcessor {
-        override def newEngine = new SmarterRubySassEngine("sass")
-    })
+	addpost(new BourbonCssProcessor {
+		override def newEngine = new SmarterRubySassEngine("sass")
+	})
 }
 
 trait Scss extends CssUrlPre { this: WroPlan =>
-    addpost(new BourbonCssProcessor {
-        override def newEngine = new SmarterRubySassEngine("scss")
-    })
+	addpost(new BourbonCssProcessor {
+		override def newEngine = new SmarterRubySassEngine("scss")
+	})
 }
 
 trait CssUrlPre { this: WroPlan =>
-    addpre(new CssImportPreProcessor)
-//    addpre(new CssUrlRewritingProcessor)
+	addpre(new CssImportPreProcessor)
+	//    addpre(new CssUrlRewritingProcessor)
 }
 
 trait CssPre extends CssUrlPre { this: WroPlan =>
-    addpre(new CssVariablesProcessor)
+	addpre(new CssVariablesProcessor)
 }
 
-trait CssMinPost { this: WroPlan => 
-    if (Wro.config.cssMin) addpost(new JawrCssMinifierProcessor)
+trait CssMinPost { this: WroPlan =>
+	if (!Wro.debug) addpost(new JawrCssMinifierProcessor)
 }
 
 // keeps throwing:
 //ro.isdc.wro.WroRuntimeException: Compilation has errors: [JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 57 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 245 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 5066 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 8373 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10128 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10129 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10131 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10132 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10148 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 10296 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 11588 : 0, JSC_PARSE_ERROR. Parse error. identifier is a reserved word at libs line 11605 : 0]
 //trait JsGCMinPost { this: WroPlan =>
-//    if (Wro.jsMin) {
+//    if (!Wro.debug) {
 //		  import ro.isdc.wro.extensions.processor.js.GoogleClosureCompressorProcessor
 //        val m = new GoogleClosureCompressorProcessor
 //        m setEncoding "UTF8"
@@ -196,52 +170,52 @@ trait CssMinPost { this: WroPlan =>
 //}
 
 trait JsMinPost { this: WroPlan =>
-    if (Wro.config.jsMin) addpost(new JSMinProcessor)
+	if (!Wro.debug) addpost(new JSMinProcessor)
 }
 
 trait JsPre { this: WroPlan =>
-    addpre(new SemicolonAppenderPreProcessor)
+	addpre(new SemicolonAppenderPreProcessor)
 }
 
 class SmarterRubySassEngine(syntax: String) extends RubySassEngine with Logger {
 
-    val requires = List("rubygems", "sass/plugin", "sass/engine", "bourbon")
+	val requires = List("rubygems", "sass/plugin", "sass/engine", "bourbon")
 
-    override def process(content: String): String = {
-        if (StringUtils.isEmpty(content)) StringUtils.EMPTY
-        else {
-            val stopWatch = new StopWatch()
+	override def process(content: String): String = {
+		if (StringUtils.isEmpty(content)) StringUtils.EMPTY
+		else {
+			val stopWatch = new StopWatch()
 
-            try {
-                logger.debug("process " + syntax)
-                stopWatch.start("process " + syntax)
-                val rubyEngine: ScriptEngine = new ScriptEngineManager().getEngineByName("jruby")
-                val updateScript = buildUpdateScript(content, syntax)
-                val css = rubyEngine.eval(updateScript).toString();
-                css
-            } finally {
-                stopWatch.stop();
-                logger.debug(stopWatch.prettyPrint());
-            }
-        }
-    }
+			try {
+				logger.debug("process " + syntax)
+				stopWatch.start("process " + syntax)
+				val rubyEngine: ScriptEngine = new ScriptEngineManager().getEngineByName("jruby")
+				val updateScript = buildUpdateScript(content, syntax)
+				val css = rubyEngine.eval(updateScript).toString();
+				css
+			} finally {
+				stopWatch.stop();
+				logger.debug(stopWatch.prettyPrint());
+			}
+		}
+	}
 
-    private def buildUpdateScript(content: String, syntax: String): String = {
+	private def buildUpdateScript(content: String, syntax: String): String = {
 
-        Validate.notNull(content)
-        val raw = new StringWriter()
-        val script = new PrintWriter(raw)
-        val sb = new StringBuilder()
-        sb.append(":syntax => :" + syntax)
+		Validate.notNull(content)
+		val raw = new StringWriter()
+		val script = new PrintWriter(raw)
+		val sb = new StringBuilder()
+		sb.append(":syntax => :" + syntax)
 
-        for (require <- requires) script.println("  require '" + require + "'                                   ");
+		for (require <- requires) script.println("  require '" + require + "'                                   ");
 
-        val scriptAsString = String.format("result = Sass::Engine.new('%s', {%s}).render",
-            content.replace("'", "\""), sb.toString())
-        logger.debug("scriptAsString: " + scriptAsString)
-        script.println(scriptAsString)
-        script.flush()
-        raw.toString()
-    }
+		val scriptAsString = String.format("result = Sass::Engine.new('%s', {%s}).render",
+			content.replace("'", "\""), sb.toString())
+		logger.debug("scriptAsString: " + scriptAsString)
+		script.println(scriptAsString)
+		script.flush()
+		raw.toString()
+	}
 }
 

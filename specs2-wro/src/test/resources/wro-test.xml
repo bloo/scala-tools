@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<groups xmlns="http://www.isdc.ro/wro">
+
+  <group name="main">
+    <js>classpath:coffeescript/*.coffee</js>
+    <css>classpath:sass/*.sass</css>
+  </group>
+
+</groups>

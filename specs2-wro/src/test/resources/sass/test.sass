@@ -1,0 +1,14 @@
+
+@mixin foo($size)
+	width: $size
+
+.foo1
+	@include foo(600px)
+	text-align: center
+
+.foo2
+	@include foo(300px)
+	text-align: right
+	.bar2
+		background-color: red
+	

@@ -2,36 +2,67 @@ package b.uf.wro
 
 import ro.isdc.wro.http.WroFilter
 import java.io.File
+import java.util.UUID
+import ro.isdc.wro.manager.factory.standalone.DefaultStandaloneContextAwareManagerFactory
 
 object WroGenerator extends b.log.Logger {
 
-	def generate(outputDir: String, resources: (String, WroFilter)*): Seq[File] =
-		generate(new File(outputDir), resources:_*)
+	def start(routes: (String, WroFilter)*): (unfiltered.jetty.Http, Seq[String]) = {
 
-	def generate(outputDir: File, resources: (String, WroFilter)*): Seq[File] = {
-		val cl = ClassLoader.getSystemClassLoader()
-		generate(cl, outputDir, resources:_*)
+		val generator = unfiltered.jetty.Http(unfiltered.util.Port.any)
+		WroPlans.planner(generator, routes:_*)
+
+		import javax.servlet.FilterConfig
+		import javax.servlet.http.HttpServletRequest
+		import javax.servlet.http.HttpServletResponse
+
+		import org.mockito.Mockito
+
+		import b.uf.wro.WroPlans
+		import ro.isdc.wro.config.Context
+		import ro.isdc.wro.config.jmx.WroConfiguration
+		import ro.isdc.wro.http.WroFilter
+		import ro.isdc.wro.model.resource.ResourceType
+		import scala.collection.JavaConversions._
+
+		val paths: Seq[String] = routes flatMap {
+			case (ctx, plan) => {
+				// mocks to set wro context.. god i hate this library
+				val request = Mockito.mock(classOf[HttpServletRequest])
+				val response = Mockito.mock(classOf[HttpServletResponse])
+				val fConfig = Mockito.mock(classOf[FilterConfig])
+				val config = new WroConfiguration()
+				Context.set(Context.webContext(request, response, fConfig), config)
+
+				plan.getWroManagerFactory().create().getModelFactory().create().getGroups().toSeq flatMap { group =>
+					ResourceType.values().toSeq map { ext => ctx + "/" + group.getName() + "." + ext.name().toLowerCase() }
+				}
+			}
+		}
+
+		val rp = routes map { case (p,_) => p }
+		generator start ()
+		generator -> paths
+	}
+
+	def generate(outputDir: File, routes: (String, WroFilter)*): Seq[File] = {
+		val (generator, paths) = start(routes: _*)
+		val port = generator.port
+		info("WroGenerator started.")
+		val dumped = dump(port, paths, outputDir)
+		info("WroGenerator completed. stopping...")
+		stop(generator)		
+		info("WroGenerator stopped.")
+		dumped
 	}
 	
-	def generate(cl: ClassLoader, outputDir: File, resources: (String, WroFilter)*): Seq[File] = {
-		
-		val generator = unfiltered.jetty.Http(unfiltered.util.Port.any)
-		val paths = WroPlans.planner(generator, resources:_*)
-
-		generator.start()
-		info("started.")
-		val genedFiles = visitPaths(outputDir, paths, generator)
-		info("completed. stopping...")
+	def stop(generator: unfiltered.jetty.Http) = {
 		generator stop()
 		generator destroy()
-		info("stopped.")
-		genedFiles
 	}
-
-	def visitPaths(dest: File, paths: Seq[String], generator: unfiltered.jetty.Http): Seq[File] = {
-
-		val syncList = new scala.collection.mutable.ArrayBuffer[File]()
-			with scala.collection.mutable.SynchronizedBuffer[File]
+	
+	def dump(port: Int, paths: Seq[String], outputDir: File): Seq[File] = {
+		val syncList = new scala.collection.mutable.ArrayBuffer[File]() with scala.collection.mutable.SynchronizedBuffer[File]
 
 		import scala.concurrent._
 		import scala.concurrent.duration._
@@ -39,22 +70,25 @@ object WroGenerator extends b.log.Logger {
 		import scala.util.{ Success, Failure }
 		import dispatch.classic._
 		
-		info(s"Started server localhost:" + generator.port)
+		info(s"Started WroGenerator @ localhost:" + port)
+
 		val h = new Http with thread.Safety
 		val futures = paths map { path =>
 			val f = future {
 				info(s"Requesting path $path")
 				// http://dispatch-classic.databinder.net/Try+Dispatch.html
-				val req = :/("localhost", generator.port) / path.replaceFirst("/", "")
+				val req = :/("localhost", port) / path.replaceFirst("/", "")
+				val p = req.path
 				h(req as_str)
 			}
 			f onComplete {
-				case Success(content) => syncList += _entityToFile(content, dest + path)
+				case Success(content) => syncList += _entityToFile(content, outputDir + path)
 				case Failure(t) => throw t
 			}
 			f
 		}
 		futures foreach { Await.ready(_, 5 minutes) }
+		h.shutdown
 		syncList.toSeq
 	}
 

@@ -9,7 +9,7 @@ object BlooDistBuild extends Build {
 	    unfiltered_api_core,
 	    unfiltered_api_auth,
 	    unfiltered_wro,
-	    unfiltered_wro_sbt,
+//	    unfiltered_wro_sbt,
 	    specs2_wro,
 	    specs2_core,
 	    specs2_api,
