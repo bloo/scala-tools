@@ -44,15 +44,12 @@ object WroGenerator extends b.log.Logger {
 		generator start ()
 		generator -> paths
 	}
-
-	def generate(outputDir: File, routes: (String, WroFilter)*): Seq[File] =
-		generate(true, outputDir, routes:_*)
 		
-	def generate(parallel: Boolean, outputDir: File, routes: (String, WroFilter)*): Seq[File] = {
+	def generate(outputDir: File, routes: (String, WroFilter)*): Seq[File] = {
 		val (generator, paths) = start(routes: _*)
 		val port = generator.port
 		info("WroGenerator started.")
-		val dumped = dump(port, paths, outputDir, parallel)
+		val dumped = dump(port, paths, outputDir, true)
 		info("WroGenerator completed. stopping...")
 		stop(generator)		
 		info("WroGenerator stopped.")
