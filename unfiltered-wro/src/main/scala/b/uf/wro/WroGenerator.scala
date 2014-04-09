@@ -45,11 +45,14 @@ object WroGenerator extends b.log.Logger {
 		generator -> paths
 	}
 
-	def generate(outputDir: File, routes: (String, WroFilter)*): Seq[File] = {
+	def generate(outputDir: File, routes: (String, WroFilter)*): Seq[File] =
+		generate(true, outputDir, routes:_*)
+		
+	def generate(parallel: Boolean, outputDir: File, routes: (String, WroFilter)*): Seq[File] = {
 		val (generator, paths) = start(routes: _*)
 		val port = generator.port
 		info("WroGenerator started.")
-		val dumped = dump(port, paths, outputDir)
+		val dumped = dump(port, paths, outputDir, parallel)
 		info("WroGenerator completed. stopping...")
 		stop(generator)		
 		info("WroGenerator stopped.")
@@ -61,7 +64,7 @@ object WroGenerator extends b.log.Logger {
 		generator destroy()
 	}
 	
-	def dump(port: Int, paths: Seq[String], outputDir: File): Seq[File] = {
+	def dump(port: Int, paths: Seq[String], outputDir: File, parallel: Boolean = false): Seq[File] = {
 		val syncList = new scala.collection.mutable.ArrayBuffer[File]() with scala.collection.mutable.SynchronizedBuffer[File]
 
 		import scala.concurrent._
@@ -72,23 +75,33 @@ object WroGenerator extends b.log.Logger {
 		
 		info(s"Started WroGenerator @ localhost:" + port)
 
-		val h = new Http with thread.Safety
-		val futures = paths map { path =>
-			val f = future {
-				info(s"Requesting path $path")
-				// http://dispatch-classic.databinder.net/Try+Dispatch.html
+		if (parallel) {
+			val h = new Http with thread.Safety
+			val futures = paths map { path =>
+				val f = future {
+					info(s"Requesting path $path")
+					// http://dispatch-classic.databinder.net/Try+Dispatch.html
+					val req = :/("localhost", port) / path.replaceFirst("/", "")
+					h(req as_str)
+				}
+				f onComplete {
+					case Success(content) => syncList += _entityToFile(content, outputDir + path)
+					case Failure(t) => throw t
+				}
+				f
+			}
+			futures foreach { Await.result(_, 5 minutes) }			
+			h.shutdown()
+		} else {
+			val h = new Http
+			paths map { path =>
 				val req = :/("localhost", port) / path.replaceFirst("/", "")
-				val p = req.path
-				h(req as_str)
+				val content = h(req as_str)
+				syncList += _entityToFile(content, outputDir + path)
 			}
-			f onComplete {
-				case Success(content) => syncList += _entityToFile(content, outputDir + path)
-				case Failure(t) => throw t
-			}
-			f
+			h.shutdown()
 		}
-		futures foreach { Await.ready(_, 5 minutes) }
-		h.shutdown
+
 		syncList.toSeq
 	}
 
