@@ -99,6 +99,7 @@ object WroGenerator extends b.log.Logger {
 			h.shutdown()
 		}
 
+		println(s"SyncList: $syncList")
 		syncList.toSeq
 	}
 
